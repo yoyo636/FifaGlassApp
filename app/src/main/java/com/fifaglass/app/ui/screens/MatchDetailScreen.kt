@@ -50,7 +50,7 @@ import kotlinx.coroutines.withContext
 
 /** 比赛详情：比分、事件时间轴（进球/红黄牌/换人/关键节点）、技术统计、阵容、内嵌预测 */
 @Composable
-fun MatchDetailScreen(m: MatchInfo, rankings: List<Team>?, onOpenCompanion: () -> Unit = {}) {
+fun MatchDetailScreen(m: MatchInfo, rankings: List<Team>?, onOpenCompanion: () -> Unit = {}, onOpenStream: () -> Unit = {}) {
     var detail by remember { mutableStateOf<MatchDetail?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
     var livePrediction by remember { mutableStateOf<com.fifaglass.app.rating.Prediction?>(null) }
@@ -213,6 +213,17 @@ fun MatchDetailScreen(m: MatchInfo, rankings: List<Team>?, onOpenCompanion: () -
             contentAlignment = Alignment.Center
         ) {
             Text("📺 看球伴侣 · 实时辅助工具", color = GlassColors.accentMint, fontSize = 15.sp, fontWeight = FontWeight.Bold)
+        }
+        Spacer(Modifier.height(12.dp))
+
+        Box(
+            Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp))
+                .background(GlassColors.up.copy(alpha = 0.15f))
+                .clickable { onOpenStream() }
+                .padding(vertical = 12.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Text("📹 观看直播 / 录播", color = GlassColors.up, fontSize = 15.sp, fontWeight = FontWeight.Bold)
         }
         Spacer(Modifier.height(12.dp))
 

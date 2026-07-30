@@ -35,6 +35,7 @@ import com.fifaglass.app.ui.screens.CompetitionsScreen
 import com.fifaglass.app.ui.screens.FullPool
 import com.fifaglass.app.ui.screens.HomeScreen
 import com.fifaglass.app.ui.screens.LiveMatchCompanion
+import com.fifaglass.app.ui.screens.LiveStreamScreen
 import com.fifaglass.app.ui.screens.MatchDetailScreen
 import com.fifaglass.app.ui.screens.MatchesScreen
 import com.fifaglass.app.ui.screens.RankingScreen
@@ -53,9 +54,11 @@ sealed interface Screen {
     data object Matches : Screen
     data object Competitions : Screen
     data object Settings : Screen
+    data object LiveStream : Screen
     data class TeamDetail(val team: Team) : Screen
     data class MatchDetail(val match: MatchInfo) : Screen
     data class Companion(val match: MatchInfo) : Screen
+    data class Stream(val match: MatchInfo?) : Screen
     data class CompetitionMatches(val competition: Competition) : Screen
 }
 
@@ -151,13 +154,17 @@ fun AppRoot() {
                     is Screen.MatchDetail -> MatchDetailScreen(
                         m = s.match,
                         rankings = current,
-                        onOpenCompanion = { navigate(Screen.Companion(s.match)) }
+                        onOpenCompanion = { navigate(Screen.Companion(s.match)) },
+                        onOpenStream = { navigate(Screen.Stream(s.match)) }
                     )
                     is Screen.Companion -> LiveMatchCompanion(
                         m = s.match,
                         rankings = current,
-                        onMatchClick = { navigate(Screen.MatchDetail(it)) }
+                        onMatchClick = { navigate(Screen.MatchDetail(it)) },
+                        onOpenStream = { navigate(Screen.Stream(s.match)) }
                     )
+                    is Screen.Stream -> LiveStreamScreen(match = s.match)
+                    is Screen.LiveStream -> LiveStreamScreen(match = null)
                     is Screen.Settings -> SettingsScreen()
                 }
             }
@@ -173,8 +180,7 @@ fun AppRoot() {
             ) {
                 NavItem("主页", screen is Screen.Home) { toTab(Screen.Home) }
                 NavItem("排名", screen is Screen.Ranking || screen is Screen.TeamDetail) { toTab(Screen.Ranking) }
-                NavItem("对比", screen is Screen.Compare) { toTab(Screen.Compare) }
-                NavItem("图表", screen is Screen.Stats) { toTab(Screen.Stats) }
+                NavItem("直播", screen is Screen.LiveStream || screen is Screen.Stream) { toTab(Screen.LiveStream) }
                 NavItem(
                     "比赛",
                     screen is Screen.Matches || screen is Screen.MatchDetail ||

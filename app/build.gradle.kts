@@ -12,8 +12,8 @@ android {
         applicationId = "com.fifaglass.app"
         minSdk = 26
         targetSdk = 34
-        versionCode = 4
-        versionName = "1.5"
+        versionCode = 5
+        versionName = "1.6"
     }
 
     buildTypes {
@@ -47,4 +47,9 @@ dependencies {
     implementation("io.coil-kt:coil-compose:2.6.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
     implementation("androidx.work:work-runtime-ktx:2.9.1")
+    implementation("androidx.media3:media3-exoplayer:1.3.1")
+    implementation("androidx.media3:media3-exoplayer-hls:1.3.1")
+    implementation("androidx.media3:media3-ui:1.3.1")
+    implementation("androidx.media3:media3-common:1.3.1")
+    implementation("androidx.media3:media3-datasource:1.3.1")
 }

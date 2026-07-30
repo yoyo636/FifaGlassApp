@@ -89,6 +89,7 @@ fun LiveMatchCompanion(
     m: MatchInfo,
     rankings: List<Team>?,
     onMatchClick: (MatchInfo) -> Unit,
+    onOpenStream: () -> Unit = {},
 ) {
     val context = LocalContext.current
     var detail by remember { mutableStateOf<MatchDetail?>(null) }
@@ -199,7 +200,7 @@ fun LiveMatchCompanion(
 
         // 工具箱入口
         item {
-            MatchToolsEntry(m)
+            MatchToolsEntry(m, onOpenStream)
             Spacer(Modifier.height(100.dp))
         }
     }
@@ -871,11 +872,16 @@ private fun GoalAnimOverlay(data: GoalAnimData, onDismiss: () -> Unit) {
 // 工具箱入口
 // ─────────────────────────────────────────────────────────────────────────────
 @Composable
-private fun MatchToolsEntry(m: MatchInfo) {
+private fun MatchToolsEntry(m: MatchInfo, onOpenStream: () -> Unit = {}) {
     val context = LocalContext.current
     GlassCard(Modifier.fillMaxWidth()) {
         Text("看球工具箱", color = GlassColors.textPrimary, fontSize = 16.sp, fontWeight = FontWeight.Bold)
         Spacer(Modifier.height(10.dp))
+
+        // 31. 观看直播 / 录播
+        ToolButton("📺 观看直播 / 录播", GlassColors.up) {
+            onOpenStream()
+        }
 
         // 22. 投屏
         ToolButton("📺 投屏到电视", GlassColors.accentBlue) {
