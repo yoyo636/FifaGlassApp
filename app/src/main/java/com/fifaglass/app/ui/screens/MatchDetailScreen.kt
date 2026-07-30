@@ -1,6 +1,7 @@
 package com.fifaglass.app.ui.screens
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -49,7 +50,7 @@ import kotlinx.coroutines.withContext
 
 /** 比赛详情：比分、事件时间轴（进球/红黄牌/换人/关键节点）、技术统计、阵容、内嵌预测 */
 @Composable
-fun MatchDetailScreen(m: MatchInfo, rankings: List<Team>?) {
+fun MatchDetailScreen(m: MatchInfo, rankings: List<Team>?, onOpenCompanion: () -> Unit = {}) {
     var detail by remember { mutableStateOf<MatchDetail?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
     var livePrediction by remember { mutableStateOf<com.fifaglass.app.rating.Prediction?>(null) }
@@ -201,6 +202,17 @@ fun MatchDetailScreen(m: MatchInfo, rankings: List<Team>?) {
                     )
                 }
             }
+        }
+        Spacer(Modifier.height(12.dp))
+
+        Box(
+            Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp))
+                .background(GlassColors.accentMint.copy(alpha = 0.15f))
+                .clickable { onOpenCompanion() }
+                .padding(vertical = 12.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Text("📺 看球伴侣 · 实时辅助工具", color = GlassColors.accentMint, fontSize = 15.sp, fontWeight = FontWeight.Bold)
         }
         Spacer(Modifier.height(12.dp))
 

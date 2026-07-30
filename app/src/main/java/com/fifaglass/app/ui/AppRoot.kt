@@ -34,9 +34,12 @@ import com.fifaglass.app.ui.screens.CompetitionMatchesScreen
 import com.fifaglass.app.ui.screens.CompetitionsScreen
 import com.fifaglass.app.ui.screens.FullPool
 import com.fifaglass.app.ui.screens.HomeScreen
+import com.fifaglass.app.ui.screens.LiveMatchCompanion
 import com.fifaglass.app.ui.screens.MatchDetailScreen
 import com.fifaglass.app.ui.screens.MatchesScreen
 import com.fifaglass.app.ui.screens.RankingScreen
+import com.fifaglass.app.ui.screens.SettingsScreen
+import com.fifaglass.app.ui.screens.SettingsStore
 import com.fifaglass.app.ui.screens.StatsScreen
 import com.fifaglass.app.ui.screens.TeamDetailScreen
 import kotlinx.coroutines.Dispatchers
@@ -49,8 +52,10 @@ sealed interface Screen {
     data object Stats : Screen
     data object Matches : Screen
     data object Competitions : Screen
+    data object Settings : Screen
     data class TeamDetail(val team: Team) : Screen
     data class MatchDetail(val match: MatchInfo) : Screen
+    data class Companion(val match: MatchInfo) : Screen
     data class CompetitionMatches(val competition: Competition) : Screen
 }
 
@@ -64,7 +69,11 @@ fun AppRoot() {
     BackHandler(enabled = stack.size > 1) { back() }
 
     val context = LocalContext.current
-    LaunchedEffect(Unit) { Favorites.init(context) }
+    LaunchedEffect(Unit) {
+        Favorites.init(context)
+        SettingsStore.init(context)
+        SettingsStore.recordOpen()
+    }
 
     var gender by remember { mutableStateOf(1) }
     var men by remember { mutableStateOf<List<Team>?>(null) }
@@ -141,8 +150,15 @@ fun AppRoot() {
                     )
                     is Screen.MatchDetail -> MatchDetailScreen(
                         m = s.match,
-                        rankings = current
+                        rankings = current,
+                        onOpenCompanion = { navigate(Screen.Companion(s.match)) }
                     )
+                    is Screen.Companion -> LiveMatchCompanion(
+                        m = s.match,
+                        rankings = current,
+                        onMatchClick = { navigate(Screen.MatchDetail(it)) }
+                    )
+                    is Screen.Settings -> SettingsScreen()
                 }
             }
 
@@ -150,26 +166,22 @@ fun AppRoot() {
                 Modifier
                     .align(Alignment.BottomCenter)
                     .fillMaxWidth()
-                    .padding(horizontal = 12.dp, vertical = 12.dp)
+                    .padding(horizontal = 8.dp, vertical = 12.dp)
                     .glass(28.dp)
-                    .padding(vertical = 6.dp, horizontal = 4.dp),
+                    .padding(vertical = 6.dp, horizontal = 2.dp),
                 horizontalArrangement = Arrangement.SpaceEvenly
             ) {
-                NavItem(
-                    "主页",
-                    screen is Screen.Home
-                ) { toTab(Screen.Home) }
-                NavItem(
-                    "排名",
-                    screen is Screen.Ranking || screen is Screen.TeamDetail
-                ) { toTab(Screen.Ranking) }
+                NavItem("主页", screen is Screen.Home) { toTab(Screen.Home) }
+                NavItem("排名", screen is Screen.Ranking || screen is Screen.TeamDetail) { toTab(Screen.Ranking) }
                 NavItem("对比", screen is Screen.Compare) { toTab(Screen.Compare) }
                 NavItem("图表", screen is Screen.Stats) { toTab(Screen.Stats) }
                 NavItem(
                     "比赛",
                     screen is Screen.Matches || screen is Screen.MatchDetail ||
-                        screen is Screen.Competitions || screen is Screen.CompetitionMatches
+                        screen is Screen.Competitions || screen is Screen.CompetitionMatches ||
+                        screen is Screen.Companion
                 ) { toTab(Screen.Matches) }
+                NavItem("设置", screen is Screen.Settings) { toTab(Screen.Settings) }
             }
         }
     }
@@ -182,13 +194,13 @@ private fun NavItem(label: String, selected: Boolean, onClick: () -> Unit) {
             .clip(RoundedCornerShape(20.dp))
             .then(if (selected) Modifier.glass(20.dp) else Modifier)
             .clickable { onClick() }
-            .padding(horizontal = 14.dp, vertical = 10.dp),
+            .padding(horizontal = 12.dp, vertical = 10.dp),
         contentAlignment = Alignment.Center
     ) {
         Text(
             label,
             color = if (selected) GlassColors.textPrimary else GlassColors.textSecondary,
-            fontSize = 14.sp,
+            fontSize = 13.sp,
             fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal
         )
     }
