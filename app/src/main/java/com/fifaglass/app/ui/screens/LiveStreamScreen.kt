@@ -2,8 +2,13 @@ package com.fifaglass.app.ui.screens
 
 import android.content.Intent
 import android.net.Uri
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
-import androidx.compose.ui.draw.shadow
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -37,6 +42,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -54,6 +62,7 @@ import coil.compose.AsyncImage
 import com.fifaglass.app.data.MatchInfo
 import com.fifaglass.app.data.StreamChannel
 import com.fifaglass.app.data.StreamRepository
+import com.fifaglass.app.ui.Aurora
 import com.fifaglass.app.ui.GlassCard
 import com.fifaglass.app.ui.GlassColors
 import com.fifaglass.app.ui.glass
@@ -99,35 +108,25 @@ fun LiveStreamScreen(match: MatchInfo?) {
 
     Column(Modifier.fillMaxSize().padding(horizontal = 20.dp)) {
         Spacer(Modifier.height(8.dp))
-        Text(
-            if (match != null) "直播观看" else "体育直播",
-            color = GlassColors.textPrimary,
-            fontSize = 28.sp,
-            fontWeight = FontWeight.Bold
-        )
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                if (match != null) "${match.homeName} vs ${match.awayName}"
-                else "实时体育频道 · 快速加载",
-                color = GlassColors.textSecondary,
-                fontSize = 13.sp,
-                modifier = Modifier.weight(1f)
-            )
+            Column(Modifier.weight(1f)) {
+                Text(
+                    if (match != null) "直播观看" else "体育直播",
+                    color = GlassColors.textPrimary,
+                    fontSize = 28.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    if (match != null) "${match.homeName} vs ${match.awayName}"
+                    else "实时体育频道 · 快速加载",
+                    color = GlassColors.textSecondary,
+                    fontSize = 13.sp
+                )
+            }
             if (refreshing) {
                 CircularProgressIndicator(color = GlassColors.accentMint, modifier = Modifier.size(14.dp), strokeWidth = 2.dp)
             } else {
-                Box(
-                    Modifier
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(GlassColors.accentBlue.copy(alpha = 0.15f))
-                        .clickable {
-                            refreshing = true
-                            // fire-and-forget refresh
-                        }
-                        .padding(horizontal = 10.dp, vertical = 4.dp)
-                ) {
-                    Text("刷新", color = GlassColors.accentBlue, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                }
+                AuroraRefreshButton { refreshing = true }
             }
         }
         Spacer(Modifier.height(12.dp))
@@ -170,7 +169,18 @@ fun LiveStreamScreen(match: MatchInfo?) {
         if (loading && allChannels.isEmpty()) {
             Box(Modifier.fillMaxWidth().padding(40.dp), contentAlignment = Alignment.Center) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    CircularProgressIndicator(color = GlassColors.accentMint, modifier = Modifier.size(32.dp))
+                    val transition = rememberInfiniteTransition(label = "loading")
+                    val scale by transition.animateFloat(
+                        initialValue = 0.8f, targetValue = 1.2f,
+                        animationSpec = infiniteRepeatable(
+                            animation = tween(900, easing = LinearEasing),
+                            repeatMode = RepeatMode.Reverse
+                        ), label = "loading-scale"
+                    )
+                    CircularProgressIndicator(
+                        color = GlassColors.accentMint,
+                        modifier = Modifier.size(32.dp).scale(scale)
+                    )
                     Spacer(Modifier.height(8.dp))
                     Text("正在获取体育直播源…", color = GlassColors.textSecondary, fontSize = 13.sp)
                 }
@@ -179,18 +189,7 @@ fun LiveStreamScreen(match: MatchInfo?) {
             val favUrls = remember(favTick) { StreamRepository.getFavoriteUrls() }
             val favChannels = allChannels.filter { it.url in favUrls }
             if (favChannels.isNotEmpty() && query.isBlank()) {
-                GlassCard(Modifier.fillMaxWidth()) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("收藏频道", color = GlassColors.accentGold, fontSize = 15.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-                        Text("${favChannels.size} 个", color = GlassColors.textSecondary, fontSize = 12.sp)
-                    }
-                    Spacer(Modifier.height(8.dp))
-                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        favChannels.take(5).forEach { ch ->
-                            ChannelRow(ch, selectedChannel?.url == ch.url) { selectedChannel = ch }
-                        }
-                    }
-                }
+                AuroraFavCard(favChannels, selectedChannel?.url) { selectedChannel = it }
                 Spacer(Modifier.height(10.dp))
             }
 
@@ -200,11 +199,9 @@ fun LiveStreamScreen(match: MatchInfo?) {
                     Text("未找到频道", color = GlassColors.textSecondary, fontSize = 13.sp)
                 }
             } else {
-                LazyColumn(
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
+                LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     items(list, key = { it.url }) { ch ->
-                        ChannelRow(ch, selectedChannel?.url == ch.url) {
+                        AuroraChannelRow(ch, selectedChannel?.url == ch.url) {
                             selectedChannel = ch
                         }
                     }
@@ -212,6 +209,61 @@ fun LiveStreamScreen(match: MatchInfo?) {
             }
         }
         Spacer(Modifier.height(80.dp))
+    }
+}
+
+@Composable
+private fun AuroraRefreshButton(onClick: () -> Unit) {
+    val transition = rememberInfiniteTransition(label = "refresh")
+    val rotation by transition.animateFloat(
+        initialValue = 0f, targetValue = 360f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(3000, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ), label = "rotation"
+    )
+    Box(
+        Modifier
+            .clip(RoundedCornerShape(10.dp))
+            .background(Aurora.cool(), alpha = 0.20f)
+            .clickable { onClick() }
+            .padding(horizontal = 10.dp, vertical = 4.dp)
+    ) {
+        Text("⟳ 刷新", color = GlassColors.accentBlue, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+    }
+}
+
+@Composable
+private fun AuroraFavCard(channels: List<StreamChannel>, selectedUrl: String?, onSelect: (StreamChannel) -> Unit) {
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .shadow(12.dp, RoundedCornerShape(20.dp), ambientColor = GlassColors.accentGold.copy(alpha = 0.2f))
+            .clip(RoundedCornerShape(20.dp))
+            .background(
+                Brush.linearGradient(
+                    listOf(
+                        Color(0xFFFFF7E0).copy(alpha = 0.9f),
+                        Color.White.copy(alpha = 0.85f),
+                    )
+                )
+            )
+            .padding(14.dp)
+    ) {
+        Column {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("★", color = GlassColors.accentGold, fontSize = 16.sp)
+                Spacer(Modifier.width(6.dp))
+                Text("收藏频道", color = GlassColors.textPrimary, fontSize = 15.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                Text("${channels.size} 个", color = GlassColors.textSecondary, fontSize = 12.sp)
+            }
+            Spacer(Modifier.height(8.dp))
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                channels.take(5).forEach { ch ->
+                    AuroraChannelRow(ch, selectedUrl == ch.url) { onSelect(ch) }
+                }
+            }
+        }
     }
 }
 
@@ -238,71 +290,119 @@ private fun VideoPlayerCard(channel: StreamChannel) {
         }
     }
 
-    GlassCard(Modifier.fillMaxWidth()) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("正在播放", color = GlassColors.accentMint, fontSize = 14.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-            Text(channel.quality.ifEmpty { "Live" }, color = GlassColors.accentGold, fontSize = 12.sp)
-        }
-        Spacer(Modifier.height(10.dp))
-
-        Box(
-            Modifier
-                .fillMaxWidth()
-                .aspectRatio(16f / 9f)
-                .clip(RoundedCornerShape(16.dp))
-                .background(Color.Black)
-        ) {
-            if (exoPlayer != null) {
-                AndroidView(
-                    factory = { ctx ->
-                        PlayerView(ctx).apply {
-                            player = exoPlayer
-                            useController = true
-                            setShowBuffering(PlayerView.SHOW_BUFFERING_WHEN_PLAYING)
-                        }
-                    },
-                    modifier = Modifier.fillMaxSize()
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .shadow(20.dp, RoundedCornerShape(20.dp), ambientColor = Color.Black.copy(alpha = 0.3f))
+            .clip(RoundedCornerShape(20.dp))
+            .background(Color.Black)
+    ) {
+        Column {
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .background(
+                        Brush.horizontalGradient(
+                            listOf(Color(0xFF1A1A2E), Color(0xFF0F0F18))
+                        )
+                    )
+                    .padding(horizontal = 14.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                val transition = rememberInfiniteTransition(label = "live-pulse")
+                val pulseAlpha by transition.animateFloat(
+                    initialValue = 0.4f, targetValue = 1f,
+                    animationSpec = infiniteRepeatable(
+                        animation = tween(1100, easing = LinearEasing),
+                        repeatMode = RepeatMode.Reverse
+                    ), label = "pulse-alpha"
                 )
-            } else {
-                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text("播放器初始化失败", color = Color.White, fontSize = 13.sp)
-                }
-            }
-        }
-        Spacer(Modifier.height(8.dp))
-        Text(channel.name, color = GlassColors.textPrimary, fontSize = 15.sp, fontWeight = FontWeight.Bold)
-        if (channel.country.isNotEmpty()) {
-            Text("${channel.country} · ${channel.category}", color = GlassColors.textSecondary, fontSize = 11.sp)
-        }
-        Spacer(Modifier.height(6.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            if (channel.referrer.isNotEmpty()) {
-                Text("需 Referer", color = GlassColors.accentGold, fontSize = 10.sp)
+                Box(
+                    Modifier
+                        .size(8.dp)
+                        .clip(CircleShape)
+                        .background(Color(0xFFFF375F).copy(alpha = pulseAlpha))
+                )
+                Spacer(Modifier.width(8.dp))
+                Text("LIVE", color = Color(0xFFFF375F), fontSize = 12.sp, fontWeight = FontWeight.Black)
+                Spacer(Modifier.weight(1f))
+                Text(channel.quality.ifEmpty { "Live" }, color = GlassColors.accentGold, fontSize = 12.sp)
             }
             Box(
-                Modifier.clip(RoundedCornerShape(8.dp))
-                    .background(GlassColors.accentBlue.copy(alpha = 0.15f))
-                    .clickable {
-                        runCatching {
-                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(channel.url))
-                            intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK
-                            context.startActivity(intent)
-                        }
-                    }
-                    .padding(horizontal = 10.dp, vertical = 4.dp)
+                Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(16f / 9f)
+                    .background(Color.Black)
             ) {
-                Text("外部播放器", color = GlassColors.accentBlue, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                if (exoPlayer != null) {
+                    AndroidView(
+                        factory = { ctx ->
+                            PlayerView(ctx).apply {
+                                player = exoPlayer
+                                useController = true
+                                setShowBuffering(PlayerView.SHOW_BUFFERING_WHEN_PLAYING)
+                            }
+                        },
+                        modifier = Modifier.fillMaxSize()
+                    )
+                } else {
+                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Text("播放器初始化失败", color = Color.White, fontSize = 13.sp)
+                    }
+                }
+            }
+            Column(Modifier.padding(14.dp)) {
+                Text(channel.name, color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Bold)
+                if (channel.country.isNotEmpty()) {
+                    Text("${channel.country} · ${channel.category}", color = Color.White.copy(alpha = 0.7f), fontSize = 11.sp)
+                }
+                Spacer(Modifier.height(8.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (channel.referrer.isNotEmpty()) {
+                        Text("需 Referer", color = GlassColors.accentGold, fontSize = 10.sp)
+                    }
+                    Box(
+                        Modifier.clip(RoundedCornerShape(8.dp))
+                            .background(Color.White.copy(alpha = 0.15f))
+                            .clickable {
+                                runCatching {
+                                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(channel.url))
+                                    intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                                    context.startActivity(intent)
+                                }
+                            }
+                            .padding(horizontal = 10.dp, vertical = 4.dp)
+                    ) {
+                        Text("外部播放器", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
             }
         }
     }
 }
 
 @Composable
-private fun ChannelRow(channel: StreamChannel, isSelected: Boolean, onClick: () -> Unit) {
+private fun AuroraChannelRow(channel: StreamChannel, isSelected: Boolean, onClick: () -> Unit) {
     var isFav by remember(channel.url) { mutableStateOf(StreamRepository.isFavorite(channel.url)) }
-    GlassCard(
-        modifier = Modifier.fillMaxWidth().clickable { onClick() },
-        corner = 16.dp
+    val cardMod = if (isSelected) {
+        Modifier
+            .fillMaxWidth()
+            .shadow(10.dp, RoundedCornerShape(16.dp), ambientColor = GlassColors.accentMint.copy(alpha = 0.3f))
+    } else {
+        Modifier
+            .fillMaxWidth()
+            .shadow(4.dp, RoundedCornerShape(16.dp), ambientColor = Color.Black.copy(alpha = 0.05f))
+    }
+    Box(
+        cardMod
+            .clip(RoundedCornerShape(16.dp))
+            .background(
+                if (isSelected) Aurora.success()
+                else Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.95f), Color.White.copy(alpha = 0.82f))),
+                alpha = if (isSelected) 0.15f else 1f
+            )
+            .clickable { onClick() }
+            .padding(horizontal = 12.dp, vertical = 10.dp)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             if (channel.logo.isNotEmpty()) {
@@ -314,10 +414,10 @@ private fun ChannelRow(channel: StreamChannel, isSelected: Boolean, onClick: () 
             } else {
                 Box(
                     Modifier.size(40.dp).clip(CircleShape)
-                        .background(GlassColors.accentMint.copy(alpha = 0.2f)),
+                        .background(Aurora.cool(), alpha = 0.2f),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text("TV", fontSize = 14.sp, color = GlassColors.accentMint, fontWeight = FontWeight.Bold)
+                    Text("TV", fontSize = 14.sp, color = GlassColors.accentBlue, fontWeight = FontWeight.Bold)
                 }
             }
             Spacer(Modifier.width(12.dp))

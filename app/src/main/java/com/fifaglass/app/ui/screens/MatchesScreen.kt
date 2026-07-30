@@ -1,8 +1,13 @@
 package com.fifaglass.app.ui.screens
 
 import android.content.Intent
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
-import androidx.compose.ui.draw.shadow
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -14,9 +19,11 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
@@ -30,18 +37,21 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.core.content.ContextCompat.startActivity
 import com.fifaglass.app.data.FifaApi
 import com.fifaglass.app.data.MatchInfo
 import com.fifaglass.app.data.Team
 import com.fifaglass.app.rating.Evaluator
 import com.fifaglass.app.rating.PredictionFactories
+import com.fifaglass.app.ui.Aurora
 import com.fifaglass.app.ui.GlassCard
 import com.fifaglass.app.ui.GlassColors
 import com.fifaglass.app.ui.blueMintBrush
@@ -51,9 +61,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.time.Duration
 import java.time.Instant
-import androidx.compose.ui.graphics.Color as Color1
 
-/** 实时比赛页：当前比赛 + 近期赛果，附实时评分与胜率；30 秒自动刷新；v1.3 新增倒计时/冷门/分享/性别切换 */
 @Composable
 fun MatchesScreen(
     rankings: List<Team>?,
@@ -105,7 +113,7 @@ fun MatchesScreen(
                     fontSize = 28.sp, fontWeight = FontWeight.SemiBold
                 )
                 Text(
-                    if (lastRefresh.isEmpty()) "比分 · 胜率预测 · 实时表现评分" 
+                    if (lastRefresh.isEmpty()) "比分 · 胜率预测 · 实时表现评分"
                     else "每 30 秒自动刷新 · 上次 $lastRefresh",
                     color = GlassColors.textSecondary,
                     fontSize = 13.sp
@@ -119,12 +127,7 @@ fun MatchesScreen(
                         .clickable { onOpenCompetitions() }
                         .padding(horizontal = 14.dp, vertical = 10.dp)
                 ) {
-                    Text(
-                        "赛事",
-                        color = GlassColors.accentBlue,
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.SemiBold
-                    )
+                    Text("赛事", color = GlassColors.accentBlue, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
                 }
                 Box(
                     Modifier
@@ -132,12 +135,7 @@ fun MatchesScreen(
                         .clickable { refreshTick++ }
                         .padding(horizontal = 14.dp, vertical = 10.dp)
                 ) {
-                    Text(
-                        "刷新",
-                        color = GlassColors.accentMint,
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.SemiBold
-                    )
+                    Text("刷新", color = GlassColors.accentMint, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
                 }
             }
         }
@@ -177,7 +175,7 @@ fun MatchesScreen(
                     contentPadding = PaddingValues(bottom = 96.dp)
                 ) {
                     if (playing.isNotEmpty()) {
-                        item { SectionHeader("进行中 · ${playing.size} 场") }
+                        item { LiveSectionHeader("进行中 · ${playing.size} 场") }
                         items(playing, key = { "live_" + it.id }) { m ->
                             MatchCard(m, pointsByCode) { onMatchClick(m) }
                         }
@@ -208,6 +206,33 @@ fun MatchesScreen(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun LiveSectionHeader(title: String) {
+    val transition = rememberInfiniteTransition(label = "live-header")
+    val scale by transition.animateFloat(
+        initialValue = 0.85f, targetValue = 1.15f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(900, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse
+        ), label = "live-dot"
+    )
+    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 6.dp)) {
+        Box(
+            Modifier
+                .size(10.dp)
+                .scale(scale)
+                .clip(CircleShape)
+                .background(
+                    Brush.radialGradient(
+                        listOf(Color(0xFFFF453A), Color(0xFFFF9F0A))
+                    )
+                )
+        )
+        Spacer(Modifier.width(8.dp))
+        Text(title, color = GlassColors.down, fontSize = 14.sp, fontWeight = FontWeight.Bold)
     }
 }
 
@@ -304,9 +329,11 @@ private fun MatchCard(m: MatchInfo, pointsByCode: Map<String, Double>, onClick: 
     var nowTick by remember { mutableStateOf(0) }
 
     LaunchedEffect(m.date) {
-        while (true) {
-            kotlinx.coroutines.delay(1_000)
-            nowTick++
+        if (m.isScheduled) {
+            while (true) {
+                kotlinx.coroutines.delay(1_000)
+                nowTick++
+            }
         }
     }
 
@@ -314,221 +341,173 @@ private fun MatchCard(m: MatchInfo, pointsByCode: Map<String, Double>, onClick: 
         PredictionFactories.isPotentialUpset(m.homeCode, m.awayCode)
     }
 
-    GlassCard(Modifier.fillMaxWidth().clickable { onClick() }, corner = 20.dp) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                m.competition,
-                color = GlassColors.textSecondary,
-                fontSize = 11.sp,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f)
-            )
-            if (upset) {
-                Box(
-                    Modifier
-                        .clip(RoundedCornerShape(10.dp))
-                        .background(GlassColors.down.copy(alpha = 0.2f))
-                        .padding(horizontal = 8.dp, vertical = 3.dp)
-                ) {
-                    Text(
-                        "冷门预警",
-                        color = GlassColors.down,
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-                Spacer(Modifier.width(6.dp))
-            }
-            Box(
-                Modifier
-                    .clip(RoundedCornerShape(10.dp))
-                    .background(GlassColors.accentMint.copy(alpha = 0.15f))
-                    .clickable {
-                        val prediction = PredictionFactories.predictByCode(m.homeCode, m.awayCode)
-                        val shareText = if (prediction != null) {
-                            PredictionFactories.generateShareText(prediction, m.homeName, m.awayName)
-                        } else {
-                            "${m.homeName} vs ${m.awayName}\nFifaGlass AI 预测"
-                        }
-                        val intent = Intent(Intent.ACTION_SEND).apply {
-                            type = "text/plain"
-                            putExtra(Intent.EXTRA_TEXT, shareText)
-                        }
-                        startActivity(context, Intent.createChooser(intent, "分享预测"), null)
-                    }
-                    .padding(horizontal = 8.dp, vertical = 3.dp)
-            ) {
-                Text(
-                    "分享",
-                    color = GlassColors.accentMint,
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.Bold
-                )
-            }
-        }
-        Spacer(Modifier.height(8.dp))
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                Text(
-                    m.homeName,
-                    color = GlassColors.textPrimary,
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Spacer(Modifier.height(4.dp))
-                Text(
-                    m.awayName,
-                    color = GlassColors.textPrimary,
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
-            Column(horizontalAlignment = Alignment.End) {
-                if (m.homeScore != null && m.awayScore != null) {
-                    Text(
-                        "${m.homeScore} : ${m.awayScore}",
-                        color = GlassColors.textPrimary,
-                        fontSize = 24.sp,
-                        fontWeight = FontWeight.Black
-                    )
-                }
-                Text(
-                    when {
-                        m.isLive -> if (m.matchTime.isNotEmpty()) "进行中 ${m.matchTime}" else "进行中"
-                        m.isFinished -> "已结束"
-                        kickoff != null -> "开球倒计时 ${countdownText(kickoff)}"
-                        else -> "未开始"
-                    },
-                    color = when {
-                        m.isLive -> GlassColors.up
-                        m.isFinished -> GlassColors.textSecondary
-                        else -> GlassColors.accentGold
-                    },
-                    fontSize = 12.sp
-                )
-            }
-        }
+    val isLive = m.isLive
+    val cardGlow = if (isLive) GlassColors.down else null
 
-        if (homePts != null && awayPts != null) {
-            Spacer(Modifier.height(10.dp))
-            val (pHome, pDraw, pAway) = Evaluator.matchProbabilities(homePts, awayPts)
-            ProbabilityBar(pHome.toFloat(), pDraw.toFloat(), pAway.toFloat())
-            Spacer(Modifier.height(6.dp))
-            Row {
-                Text(
-                    "${m.homeCode} ${(pHome * 100).toInt()}%",
-                    color = GlassColors.accentMint,
-                    fontSize = 12.sp,
-                    modifier = Modifier.weight(1f)
-                )
-                Text(
-                    "平 ${(pDraw * 100).toInt()}%",
-                    color = GlassColors.textSecondary,
-                    fontSize = 12.sp
-                )
-                Text(
-                    "${(pAway * 100).toInt()}% ${m.awayCode}",
-                    color = GlassColors.accentPink,
-                    fontSize = 12.sp,
-                    modifier = Modifier.weight(1f),
-                    textAlign = androidx.compose.ui.text.style.TextAlign.End
-                )
-            }
-
-            if (m.homeScore != null && m.awayScore != null) {
-                Spacer(Modifier.height(8.dp))
-                val homePerf = Evaluator.livePerformance(homePts, awayPts, m.homeScore, m.awayScore)
-                val awayPerf = Evaluator.livePerformance(awayPts, homePts, m.awayScore, m.homeScore)
-                Row {
-                    PerformanceBadge(
-                        label = m.homeCode,
-                        score = homePerf,
-                        modifier = Modifier.weight(1f)
-                    )
-                    Spacer(Modifier.width(8.dp))
-                    PerformanceBadge(
-                        label = m.awayCode,
-                        score = awayPerf,
-                        modifier = Modifier.weight(1f)
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun ProbabilityBar(pHome: Float, pDraw: Float, pAway: Float) {
-    Row(
+    val cardMod = if (cardGlow != null) {
         Modifier
             .fillMaxWidth()
-            .height(8.dp)
-            .clip(RoundedCornerShape(4.dp))
-            .background(androidx.compose.ui.graphics.Color.White.copy(alpha = 0.08f))
+            .shadow(14.dp, RoundedCornerShape(20.dp), ambientColor = cardGlow.copy(alpha = 0.30f))
+    } else {
+        Modifier
+            .fillMaxWidth()
+            .shadow(6.dp, RoundedCornerShape(20.dp), ambientColor = Color.Black.copy(alpha = 0.06f))
+    }
+
+    Box(
+        cardMod
+            .clip(RoundedCornerShape(20.dp))
+            .background(
+                if (isLive) Aurora.danger()
+                else Brush.verticalGradient(
+                    listOf(
+                        Color.White.copy(alpha = 0.95f),
+                        Color.White.copy(alpha = 0.82f),
+                    )
+                ),
+                alpha = if (isLive) 0.18f else 1f
+            )
+            .clickable { onClick() }
+            .padding(horizontal = 14.dp, vertical = 12.dp)
     ) {
-        if (pHome > 0f) {
-            Box(
-                Modifier
-                    .weight(pHome)
-                    .fillMaxSize()
-                    .background(blueMintBrush)
-            )
-        }
-        if (pDraw > 0f) {
-            Box(
-                Modifier
-                    .weight(pDraw)
-                    .fillMaxSize()
-                    .background(androidx.compose.ui.graphics.Color.White.copy(alpha = 0.25f))
-            )
-        }
-        if (pAway > 0f) {
-            Box(
-                Modifier
-                    .weight(pAway)
-                    .fillMaxSize()
-                    .background(pinkGoldBrush)
-            )
+        Column {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    m.competition,
+                    color = GlassColors.textSecondary,
+                    fontSize = 11.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f)
+                )
+                if (upset) {
+                    Box(
+                        Modifier
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(GlassColors.down.copy(alpha = 0.20f))
+                            .padding(horizontal = 8.dp, vertical = 3.dp)
+                    ) {
+                        Text(
+                            "冷门预警",
+                            color = GlassColors.down,
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                    Spacer(Modifier.width(6.dp))
+                }
+                if (isLive) {
+                    Box(
+                        Modifier
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(GlassColors.down.copy(alpha = 0.22f))
+                            .padding(horizontal = 8.dp, vertical = 3.dp)
+                    ) {
+                        Text("LIVE", color = GlassColors.down, fontSize = 10.sp, fontWeight = FontWeight.Black)
+                    }
+                }
+            }
+            Spacer(Modifier.height(8.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                TeamSide(m.homeName, m.homeCode, Modifier.weight(1f))
+                Column(
+                    Modifier.padding(horizontal = 8.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    when {
+                        m.isFinished && m.homeScore != null && m.awayScore != null -> {
+                            Text(
+                                "${m.homeScore} : ${m.awayScore}",
+                                color = GlassColors.textPrimary,
+                                fontSize = 22.sp,
+                                fontWeight = FontWeight.Black
+                            )
+                        }
+                        isLive -> {
+                            Text(
+                                "${m.homeScore ?: 0} : ${m.awayScore ?: 0}",
+                                color = GlassColors.down,
+                                fontSize = 22.sp,
+                                fontWeight = FontWeight.Black
+                            )
+                            Text(
+                                m.matchTime,
+                                color = GlassColors.down,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                        m.isScheduled && kickoff != null -> {
+                            val nowTickLocal = nowTick
+                            Text(
+                                countdownText(kickoff),
+                                color = GlassColors.accentGold,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                        else -> {
+                            Text(
+                                "VS",
+                                color = GlassColors.textSecondary,
+                                fontSize = 18.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                }
+                TeamSide(m.awayName, m.awayCode, Modifier.weight(1f), alignEnd = true)
+            }
+            if (homePts != null && awayPts != null && (m.isScheduled || m.isLive)) {
+                Spacer(Modifier.height(8.dp))
+                val (pH, pD, pA) = Evaluator.matchProbabilities(homePts, awayPts)
+                ProbabilityBarTriple(pH, pD, pA)
+                Spacer(Modifier.height(6.dp))
+                Row(Modifier.fillMaxWidth()) {
+                    Text(
+                        "${(pH * 100).toInt()}%",
+                        color = GlassColors.accentMint,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.weight(1f)
+                    )
+                    Text(
+                        "平 ${(pD * 100).toInt()}%",
+                        color = GlassColors.textSecondary,
+                        fontSize = 11.sp
+                    )
+                    Text(
+                        "${(pA * 100).toInt()}%",
+                        color = GlassColors.accentPink,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.weight(1f),
+                        textAlign = androidx.compose.ui.text.style.TextAlign.End
+                    )
+                }
+            }
         }
     }
 }
 
 @Composable
-private fun PerformanceBadge(label: String, score: Float, modifier: Modifier = Modifier) {
+private fun TeamSide(name: String, code: String, modifier: Modifier, alignEnd: Boolean = false) {
     Column(
-        modifier
-            .clip(RoundedCornerShape(14.dp))
-            .background(androidx.compose.ui.graphics.Color.White.copy(alpha = 0.07f))
-            .padding(10.dp)
+        modifier = modifier,
+        horizontalAlignment = if (alignEnd) Alignment.End else Alignment.Start
     ) {
         Text(
-            "$label 表现分",
-            color = GlassColors.textSecondary,
-            fontSize = 11.sp
+            code,
+            color = GlassColors.textPrimary,
+            fontSize = 16.sp,
+            fontWeight = FontWeight.Black
         )
-        Row(verticalAlignment = Alignment.Bottom) {
-            Text(
-                "%.0f".format(score),
-                color = when {
-                    score >= 65 -> GlassColors.up
-                    score >= 50 -> GlassColors.accentGold
-                    else -> GlassColors.down
-                },
-                fontSize = 22.sp,
-                fontWeight = FontWeight.Black
-            )
-            Spacer(Modifier.width(6.dp))
-            Text(
-                Evaluator.performanceLabel(score),
-                color = GlassColors.textSecondary,
-                fontSize = 11.sp,
-                modifier = Modifier.padding(bottom = 3.dp)
-            )
-        }
+        Text(
+            name,
+            color = GlassColors.textSecondary,
+            fontSize = 11.sp,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
     }
 }

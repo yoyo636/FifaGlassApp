@@ -1,12 +1,12 @@
 package com.fifaglass.app.ui.screens
 
+import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
-import androidx.compose.ui.draw.shadow
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -37,6 +37,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
@@ -45,6 +48,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.fifaglass.app.data.Team
+import com.fifaglass.app.ui.Aurora
 import com.fifaglass.app.ui.GlassCard
 import com.fifaglass.app.ui.GlassColors
 import com.fifaglass.app.ui.glass
@@ -66,19 +70,25 @@ fun RankingScreen(
 
     Column(Modifier.fillMaxSize().padding(horizontal = 20.dp)) {
         Spacer(Modifier.height(8.dp))
-        Text(
-            "世界排名",
-            color = GlassColors.textPrimary,
-            fontSize = 28.sp, fontWeight = FontWeight.SemiBold
-        )
-        Text(
-            "FIFA/Coca-Cola 官方数据 · 内部接口直取",
-            color = GlassColors.textSecondary,
-            fontSize = 13.sp
-        )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text(
+                    "世界排名",
+                    color = GlassColors.textPrimary,
+                    fontSize = 28.sp, fontWeight = FontWeight.SemiBold
+                )
+                Text(
+                    "FIFA/Coca-Cola 官方数据 · 内部接口直取",
+                    color = GlassColors.textSecondary,
+                    fontSize = 13.sp
+                )
+            }
+            PulsingDot()
+            Spacer(Modifier.width(8.dp))
+            Text("实时", color = GlassColors.up, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+        }
         Spacer(Modifier.height(14.dp))
 
-        // 男足/女足切换
         Row(
             Modifier
                 .fillMaxWidth()
@@ -92,7 +102,10 @@ fun RankingScreen(
                     Modifier
                         .weight(1f)
                         .clip(RoundedCornerShape(16.dp))
-                        .then(if (selected) Modifier.glass(16.dp) else Modifier)
+                        .then(
+                            if (selected) Modifier.background(Aurora.primary(isDark = false), alpha = 0.22f)
+                            else Modifier
+                        )
                         .clickable { onGenderChange(g) }
                         .padding(vertical = 10.dp),
                     contentAlignment = Alignment.Center
@@ -108,7 +121,6 @@ fun RankingScreen(
         }
         Spacer(Modifier.height(10.dp))
 
-        // 搜索
         TextField(
             value = query,
             onValueChange = { query = it },
@@ -128,23 +140,22 @@ fun RankingScreen(
         )
         Spacer(Modifier.height(10.dp))
 
-        // 洲筛选
         LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             items(CONFEDS) { c ->
                 val selected = confed == c
                 Box(
                     Modifier
                         .clip(RoundedCornerShape(14.dp))
-                        .then(if (selected) Modifier.glass(14.dp) else Modifier)
-                        .background(
-                            if (selected) Color.Transparent else Color.White.copy(alpha = 0.06f)
+                        .then(
+                            if (selected) Modifier.background(Aurora.cool(), alpha = 0.30f)
+                            else Modifier.background(Color.White.copy(alpha = 0.06f))
                         )
                         .clickable { confed = c }
                         .padding(horizontal = 14.dp, vertical = 7.dp)
                 ) {
                     Text(
                         c,
-                        color = if (selected) GlassColors.accentMint else GlassColors.textSecondary,
+                        color = if (selected) GlassColors.accentBlue else GlassColors.textSecondary,
                         fontSize = 12.sp,
                         fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal
                     )
@@ -173,7 +184,7 @@ fun RankingScreen(
                 ) {
                     if (showPodium && teams.size >= 3) {
                         item(key = "podium") {
-                            PodiumCard(teams.take(3), onTeamClick)
+                            AuroraPodiumCard(teams.take(3), onTeamClick)
                         }
                     }
                     if (favTeams.isNotEmpty()) {
@@ -195,45 +206,130 @@ fun RankingScreen(
 }
 
 @Composable
-private fun ListHeader(title: String) {
-    Text(
-        title,
-        color = GlassColors.accentGold,
-        fontSize = 14.sp,
-        fontWeight = FontWeight.Bold,
-        modifier = Modifier.padding(top = 4.dp)
+private fun PulsingDot() {
+    val transition = rememberInfiniteTransition(label = "pulse-dot")
+    val scale by transition.animateFloat(
+        initialValue = 0.7f, targetValue = 1.4f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1100, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse
+        ), label = "pulse-dot-scale"
     )
+    val alpha by transition.animateFloat(
+        initialValue = 0.4f, targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1100, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse
+        ), label = "pulse-dot-alpha"
+    )
+    Box(Modifier.size(14.dp), contentAlignment = Alignment.Center) {
+        Box(
+            Modifier
+                .size(10.dp)
+                .scale(scale)
+                .clip(CircleShape)
+                .background(GlassColors.up.copy(alpha = alpha * 0.4f))
+        )
+        Box(
+            Modifier
+                .size(6.dp)
+                .clip(CircleShape)
+                .background(GlassColors.up)
+        )
+    }
 }
 
-/** Top 3 领奖台 */
 @Composable
-private fun PodiumCard(top3: List<Team>, onTeamClick: (Team) -> Unit) {
-    GlassCard(Modifier.fillMaxWidth(), corner = 24.dp) {
+private fun ListHeader(title: String) {
+    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 4.dp)) {
+        Box(
+            Modifier
+                .size(6.dp)
+                .clip(CircleShape)
+                .background(GlassColors.accentGold)
+        )
+        Spacer(Modifier.width(8.dp))
         Text(
-            "本期三甲",
-            color = GlassColors.textPrimary,
-            fontSize = 15.sp,
+            title,
+            color = GlassColors.accentGold,
+            fontSize = 14.sp,
             fontWeight = FontWeight.Bold
         )
-        Spacer(Modifier.height(10.dp))
-        Row(
-            Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceEvenly,
-            verticalAlignment = Alignment.Bottom
-        ) {
-            PodiumItem(top3[1], "🥈", GlassColors.textSecondary, 0.9f, onTeamClick)
-            PodiumItem(top3[0], "🥇", GlassColors.accentGold, 1.15f, onTeamClick)
-            PodiumItem(top3[2], "🥉", Color(0xFFE8A87C), 0.82f, onTeamClick)
+    }
+}
+
+@Composable
+private fun AuroraPodiumCard(top3: List<Team>, onTeamClick: (Team) -> Unit) {
+    val transition = rememberInfiniteTransition(label = "podium")
+    val glow1 by transition.animateFloat(
+        initialValue = 0.6f, targetValue = 1.0f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(2200, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse
+        ), label = "podium-glow1"
+    )
+    val glow2 by transition.animateFloat(
+        initialValue = 0.4f, targetValue = 0.9f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(2800, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse
+        ), label = "podium-glow2"
+    )
+
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .shadow(24.dp, RoundedCornerShape(28.dp), ambientColor = GlassColors.accentGold.copy(alpha = glow1 * 0.45f))
+            .clip(RoundedCornerShape(28.dp))
+            .background(
+                Brush.linearGradient(
+                    listOf(
+                        Color(0xFFFFF8E7),
+                        Color(0xFFFFEBC7),
+                        Color(0xFFFFD9B3),
+                    )
+                )
+            )
+    ) {
+        Column(Modifier.padding(18.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("🏆", fontSize = 22.sp)
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    "本期三甲",
+                    color = GlassColors.textPrimary,
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(Modifier.weight(1f))
+                Text(
+                    "TOP 3",
+                    color = GlassColors.accentGold,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Black
+                )
+            }
+            Spacer(Modifier.height(14.dp))
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceEvenly,
+                verticalAlignment = Alignment.Bottom
+            ) {
+                AuroraPodiumItem(top3[1], "🥈", GlassColors.textSecondary, 0.9f, glow2 * 0.35f, onTeamClick)
+                AuroraPodiumItem(top3[0], "🥇", GlassColors.accentGold, 1.15f, glow1 * 0.6f, onTeamClick)
+                AuroraPodiumItem(top3[2], "🥉", Color(0xFFE8A87C), 0.82f, glow2 * 0.30f, onTeamClick)
+            }
         }
     }
 }
 
 @Composable
-private fun PodiumItem(
+private fun AuroraPodiumItem(
     team: Team,
     medal: String,
     accent: Color,
     scale: Float,
+    glow: Float,
     onTeamClick: (Team) -> Unit,
 ) {
     Column(
@@ -243,14 +339,31 @@ private fun PodiumItem(
             .clickable { onTeamClick(team) }
             .padding(6.dp)
     ) {
-        Text(medal, fontSize = (22 * scale).sp)
+        Text(medal, fontSize = (24 * scale).sp)
         Spacer(Modifier.height(4.dp))
-        AsyncImage(
-            model = team.flagUrl,
-            contentDescription = team.name,
-            modifier = Modifier.size((44 * scale).dp).clip(CircleShape),
-            contentScale = ContentScale.Crop
-        )
+        Box(
+            Modifier
+                .size((48 * scale).dp)
+                .shadow(
+                    if (glow > 0f) 14.dp else 4.dp,
+                    CircleShape,
+                    ambientColor = accent.copy(alpha = glow)
+                )
+                .clip(CircleShape)
+                .background(
+                    Brush.radialGradient(
+                        listOf(Color.White, accent.copy(alpha = 0.3f))
+                    )
+                ),
+            contentAlignment = Alignment.Center
+        ) {
+            AsyncImage(
+                model = team.flagUrl,
+                contentDescription = team.name,
+                modifier = Modifier.size((44 * scale).dp).clip(CircleShape),
+                contentScale = ContentScale.Crop
+            )
+        }
         Spacer(Modifier.height(6.dp))
         Text(
             team.name,
@@ -262,7 +375,8 @@ private fun PodiumItem(
         Text(
             "%.0f 分".format(team.points),
             color = accent,
-            fontSize = (11 * scale).sp
+            fontSize = (11 * scale).sp,
+            fontWeight = FontWeight.SemiBold
         )
     }
 }
@@ -274,22 +388,67 @@ private fun TeamRow(
     onToggleFavorite: (String) -> Unit,
     onClick: () -> Unit,
 ) {
-    GlassCard(
-        modifier = Modifier.fillMaxWidth().clickable { onClick() },
-        corner = 20.dp
+    val isTop3 = team.rank in 1..3
+    val glowColor = when {
+        isTop3 -> GlassColors.accentGold
+        team.rankChange > 0 -> GlassColors.up
+        team.rankChange < 0 -> GlassColors.down
+        else -> null
+    }
+
+    val baseMod = Modifier
+        .fillMaxWidth()
+        .clickable { onClick() }
+
+    val cardMod = if (glowColor != null) {
+        baseMod.shadow(16.dp, RoundedCornerShape(20.dp), ambientColor = glowColor.copy(alpha = 0.30f))
+    } else {
+        baseMod.shadow(6.dp, RoundedCornerShape(20.dp), ambientColor = Color.Black.copy(alpha = 0.06f))
+    }
+
+    Box(
+        cardMod
+            .clip(RoundedCornerShape(20.dp))
+            .background(
+                if (isTop3) Brush.verticalGradient(
+                    listOf(
+                        Color(0xFFFFF7E0).copy(alpha = 0.95f),
+                        Color.White.copy(alpha = 0.92f),
+                    )
+                )
+                else Brush.verticalGradient(
+                    listOf(
+                        Color.White.copy(alpha = 0.95f),
+                        Color.White.copy(alpha = 0.82f),
+                    )
+                )
+            )
+            .padding(horizontal = 14.dp, vertical = 12.dp)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                "${team.rank}",
-                color = when (team.rank) {
-                    1 -> GlassColors.accentGold
-                    in 2..3 -> GlassColors.accentMint
-                    else -> GlassColors.textPrimary
-                },
-                fontSize = 20.sp,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.width(40.dp)
-            )
+            Box(
+                Modifier
+                    .width(40.dp)
+                    .height(40.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(
+                        when (team.rank) {
+                            1 -> Brush.linearGradient(listOf(Color(0xFFFFD700), Color(0xFFFFA500)))
+                            2 -> Brush.linearGradient(listOf(Color(0xFFC0C0C0), Color(0xFF888888)))
+                            3 -> Brush.linearGradient(listOf(Color(0xFFCD7F32), Color(0xFF8B4513)))
+                            else -> Brush.linearGradient(listOf(Color(0xFFEFEFF5), Color(0xFFF6F6FA)))
+                        }
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    "${team.rank}",
+                    color = if (team.rank in 1..3) Color.White else GlassColors.textPrimary,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Black
+                )
+            }
+            Spacer(Modifier.width(12.dp))
             AsyncImage(
                 model = team.flagUrl,
                 contentDescription = team.name,
@@ -319,20 +478,7 @@ private fun TeamRow(
                     fontSize = 15.sp,
                     fontWeight = FontWeight.Medium
                 )
-                val changeText = when {
-                    team.rankChange > 0 -> "▲ ${team.rankChange}"
-                    team.rankChange < 0 -> "▼ ${-team.rankChange}"
-                    else -> "—"
-                }
-                Text(
-                    changeText,
-                    color = when {
-                        team.rankChange > 0 -> GlassColors.up
-                        team.rankChange < 0 -> GlassColors.down
-                        else -> GlassColors.textSecondary
-                    },
-                    fontSize = 12.sp
-                )
+                ChangeTag(team.rankChange)
             }
             Spacer(Modifier.width(8.dp))
             Text(
@@ -348,7 +494,25 @@ private fun TeamRow(
     }
 }
 
-/** 骨架屏加载态 */
+@Composable
+private fun ChangeTag(rankChange: Int) {
+    when {
+        rankChange > 0 -> Text(
+            "▲ $rankChange",
+            color = GlassColors.up,
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Bold
+        )
+        rankChange < 0 -> Text(
+            "▼ ${-rankChange}",
+            color = GlassColors.down,
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Bold
+        )
+        else -> Text("—", color = GlassColors.textSecondary, fontSize = 12.sp)
+    }
+}
+
 @Composable
 fun LoadingBox() {
     val transition = rememberInfiniteTransition(label = "skeleton")

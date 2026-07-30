@@ -12,8 +12,8 @@ android {
         applicationId = "com.fifaglass.app"
         minSdk = 26
         targetSdk = 34
-        versionCode = 8
-        versionName = "2.1.0"
+        versionCode = 9
+        versionName = "3.0.0-beta"
     }
 
     buildTypes {

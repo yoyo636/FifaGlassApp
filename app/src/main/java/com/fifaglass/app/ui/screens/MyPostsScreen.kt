@@ -64,7 +64,7 @@ fun MyPostsScreen(
                 contentPadding = PaddingValues(bottom = 96.dp)
             ) {
                 items(posts, key = { it.id }) { post ->
-                    PostCard(post) { onPostClick(post) }
+                    AuroraPostCard(post) { onPostClick(post) }
                 }
             }
         }

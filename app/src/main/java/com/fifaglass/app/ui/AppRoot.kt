@@ -2,9 +2,13 @@ package com.fifaglass.app.ui
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.Crossfade
+import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -16,7 +20,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -252,7 +256,7 @@ fun AppRoot() {
                     }
                 }
 
-                LiquidTabBar(
+                AuroraTabBar(
                     selectedIndex = selectedTab,
                     onTabSelected = { idx -> toTab(tabs[idx].screen) },
                     modifier = Modifier
@@ -266,7 +270,7 @@ fun AppRoot() {
 }
 
 @Composable
-private fun LiquidTabBar(
+private fun AuroraTabBar(
     selectedIndex: Int,
     onTabSelected: (Int) -> Unit,
     modifier: Modifier = Modifier,
@@ -274,19 +278,13 @@ private fun LiquidTabBar(
     Box(
         modifier = modifier
             .height(64.dp)
-            .shadow(20.dp, RoundedCornerShape(28.dp), clip = false)
-            .clip(RoundedCornerShape(28.dp))
-            .background(
-                Brush.verticalGradient(
-                    colors = listOf(
-                        Color.White.copy(alpha = 0.85f),
-                        Color(0xFFF5F5F7).copy(alpha = 0.78f)
-                    )
-                )
-            )
+            .shadow(28.dp, RoundedCornerShape(32.dp), clip = false, ambientColor = Color(0x40000000))
+            .clip(RoundedCornerShape(32.dp))
+            .background(Aurora.tabBar())
+            .padding(4.dp)
     ) {
         Row(
-            modifier = Modifier.fillMaxSize().padding(horizontal = 4.dp),
+            modifier = Modifier.fillMaxSize(),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceEvenly
         ) {
@@ -304,33 +302,38 @@ private fun LiquidTabBar(
 
 @Composable
 private fun TabItem(tab: TabInfo, selected: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
-    val scale by animateFloatAsState(if (selected) 1.05f else 1f, label = "tab-scale")
-    val iconColor = if (selected) GlassColors.accentBlue else GlassColors.textSecondary
+    val interaction = remember { MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
+    val scale by animateFloatAsState(
+        targetValue = if (pressed) 0.94f else if (selected) 1.04f else 1f,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessHigh),
+        label = "tab-scale"
+    )
+    val iconColor = if (selected) Color.White else GlassColors.textSecondary
     val textColor = if (selected) GlassColors.textPrimary else GlassColors.textSecondary
-    val fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium
+    val fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium
 
     Box(
         modifier = modifier
             .fillMaxSize()
-            .clip(RoundedCornerShape(20.dp))
-            .clickable { onClick() }
+            .clip(RoundedCornerShape(28.dp))
+            .clickable(interactionSource = interaction, indication = null) { onClick() }
             .padding(vertical = 6.dp),
         contentAlignment = Alignment.Center
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            if (selected) {
-                Box(
-                    modifier = Modifier
-                        .size(40.dp)
-                        .scale(scale)
-                        .clip(RoundedCornerShape(14.dp))
-                        .background(GlassColors.accentBlue.copy(alpha = 0.12f)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    SimpleIcon(icon = tab.icon, color = iconColor, size = 22.dp)
-                }
-            } else {
-                SimpleIcon(icon = tab.icon, color = iconColor, size = 22.dp)
+            Box(
+                modifier = Modifier
+                    .size(if (selected) 44.dp else 32.dp)
+                    .clip(RoundedCornerShape(if (selected) 16.dp else 12.dp))
+                    .background(
+                        if (selected) Aurora.primary(isDark = false)
+                        else Brush.verticalGradient(listOf(Color.Transparent, Color.Transparent))
+                    )
+                    .graphicsLayerScale(scale),
+                contentAlignment = Alignment.Center
+            ) {
+                SimpleIcon(icon = tab.icon, color = iconColor, size = 20.dp)
             }
             Spacer(Modifier.height(2.dp))
             Text(
@@ -342,6 +345,11 @@ private fun TabItem(tab: TabInfo, selected: Boolean, onClick: () -> Unit, modifi
         }
     }
 }
+
+private fun Modifier.graphicsLayerScale(value: Float): Modifier =
+    this.then(
+        Modifier.graphicsLayer(scaleX = value, scaleY = value)
+    )
 
 @Composable
 private fun SimpleIcon(icon: String, color: Color, size: androidx.compose.ui.unit.Dp) {
@@ -360,5 +368,3 @@ private fun SimpleIcon(icon: String, color: Color, size: androidx.compose.ui.uni
         fontWeight = FontWeight.Bold
     )
 }
-
-private fun Modifier.scale(value: Float): Modifier = this.graphicsLayer(scaleX = value, scaleY = value)
