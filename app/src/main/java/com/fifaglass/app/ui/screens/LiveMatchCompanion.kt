@@ -22,6 +22,7 @@ import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.ui.draw.shadow
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -136,7 +137,7 @@ fun LiveMatchCompanion(
     val awayPts = awayTeam?.points ?: 0.0
 
     LazyColumn(
-        Modifier.fillMaxSize().padding(horizontal = 16.dp),
+        Modifier.fillMaxSize().padding(horizontal = 20.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         item {

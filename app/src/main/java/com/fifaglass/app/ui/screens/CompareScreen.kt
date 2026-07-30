@@ -1,6 +1,7 @@
 package com.fifaglass.app.ui.screens
 
 import androidx.compose.foundation.background
+import androidx.compose.ui.draw.shadow
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -82,14 +83,13 @@ fun CompareScreen(teams: List<Team>?, error: String?) {
         Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(horizontal = 16.dp)
+            .padding(horizontal = 20.dp)
     ) {
         Spacer(Modifier.height(8.dp))
         Text(
             "球队对比 · 预测",
             color = GlassColors.textPrimary,
-            fontSize = 32.sp,
-            fontWeight = FontWeight.Bold
+            fontSize = 28.sp, fontWeight = FontWeight.SemiBold
         )
         Text(
             "选两支球队：能力对比 + 万行预测系统完整输出",

@@ -1,6 +1,7 @@
 package com.fifaglass.app.ui.screens
 
 import androidx.compose.foundation.background
+import androidx.compose.ui.draw.shadow
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -83,7 +84,7 @@ fun SearchScreen(
         it.name.contains(q, true) || it.region.contains(q, true)
     } ?: emptyList() else emptyList()
 
-    Column(Modifier.fillMaxSize().padding(horizontal = 16.dp)) {
+    Column(Modifier.fillMaxSize().padding(horizontal = 20.dp)) {
         Spacer(Modifier.height(8.dp))
         Text("搜索", color = GlassColors.textPrimary, fontSize = 28.sp, fontWeight = FontWeight.Bold)
         Text("球队 · 比赛 · 赛事", color = GlassColors.textSecondary, fontSize = 13.sp)

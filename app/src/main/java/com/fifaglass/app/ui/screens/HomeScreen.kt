@@ -29,6 +29,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
@@ -42,13 +44,12 @@ import com.fifaglass.app.data.MatchInfo
 import com.fifaglass.app.data.Team
 import com.fifaglass.app.ui.GlassCard
 import com.fifaglass.app.ui.GlassColors
-import com.fifaglass.app.ui.glass
+import com.fifaglass.app.ui.LocalGlassTheme
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 
-/** 主页：应用入口，聚合今日比赛、收藏球队、快捷入口与世界前三 */
 @Composable
 fun HomeScreen(
     teams: List<Team>?,
@@ -68,6 +69,7 @@ fun HomeScreen(
     var recent by remember { mutableStateOf<List<MatchInfo>?>(null) }
     var competitions by remember { mutableStateOf<List<Competition>?>(null) }
     var loadError by remember { mutableStateOf<String?>(null) }
+    val theme = LocalGlassTheme.current
 
     LaunchedEffect(gender) {
         loadError = null
@@ -90,9 +92,9 @@ fun HomeScreen(
         Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(horizontal = 16.dp)
+            .padding(horizontal = 20.dp)
     ) {
-        Spacer(Modifier.height(8.dp))
+        Spacer(Modifier.height(20.dp))
 
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
@@ -102,15 +104,11 @@ fun HomeScreen(
                     fontSize = 32.sp,
                     fontWeight = FontWeight.Bold
                 )
-                Text(
-                    today,
-                    color = GlassColors.textSecondary,
-                    fontSize = 13.sp
-                )
+                Text(today, color = GlassColors.textSecondary, fontSize = 13.sp)
             }
             GenderToggleHome(gender, onGenderChange)
         }
-        Spacer(Modifier.height(14.dp))
+        Spacer(Modifier.height(20.dp))
 
         val err = currentError
         when {
@@ -123,29 +121,29 @@ fun HomeScreen(
                     onOpenMatches = onOpenMatches,
                     onOpenStats = onOpenStats
                 )
-                Spacer(Modifier.height(14.dp))
+                Spacer(Modifier.height(20.dp))
 
                 val favTeams = teams.filter { it.code in favorites }
                 if (favTeams.isNotEmpty()) {
                     FavoritesRow(favTeams, onTeamClick)
-                    Spacer(Modifier.height(14.dp))
+                    Spacer(Modifier.height(20.dp))
                 }
 
                 SpotlightMatches(live, recent, onMatchClick)
-                Spacer(Modifier.height(14.dp))
+                Spacer(Modifier.height(20.dp))
 
                 if (teams.size >= 3) {
                     Top3Card(teams.take(3), onTeamClick)
-                    Spacer(Modifier.height(14.dp))
+                    Spacer(Modifier.height(20.dp))
                 }
 
                 if (!competitions.isNullOrEmpty()) {
                     CompetitionsRow(competitions!!, onOpenCompetitions)
-                    Spacer(Modifier.height(14.dp))
+                    Spacer(Modifier.height(20.dp))
                 }
             }
         }
-        Spacer(Modifier.height(100.dp))
+        Spacer(Modifier.height(120.dp))
     }
 }
 
@@ -153,29 +151,30 @@ fun HomeScreen(
 private fun GenderToggleHome(gender: Int, onChange: (Int) -> Unit) {
     Row(
         Modifier
-            .glass(16.dp)
-            .padding(4.dp),
-        horizontalArrangement = Arrangement.spacedBy(4.dp)
+            .shadow(4.dp, RoundedCornerShape(16.dp), clip = false)
+            .clip(RoundedCornerShape(16.dp))
+            .background(Color.White.copy(alpha = 0.7f))
+            .padding(3.dp),
+        horizontalArrangement = Arrangement.spacedBy(3.dp)
     ) {
-        listOf(1 to "男", 2 to "女").forEach { (g, label) ->
+        listOf(1 to "男足", 2 to "女足").forEach { (g, label) ->
             val selected = gender == g
             Box(
                 Modifier
-                    .clip(RoundedCornerShape(12.dp))
+                    .clip(RoundedCornerShape(13.dp))
                     .background(
                         if (selected) {
-                            if (g == 1) GlassColors.accentBlue.copy(alpha = 0.3f)
-                            else GlassColors.accentPink.copy(alpha = 0.3f)
+                            if (g == 1) GlassColors.accentBlue else GlassColors.accentPink
                         } else Color.Transparent
                     )
                     .clickable { onChange(g) }
-                    .padding(horizontal = 14.dp, vertical = 8.dp)
+                    .padding(horizontal = 14.dp, vertical = 7.dp)
             ) {
                 Text(
                     label,
-                    color = if (selected) GlassColors.textPrimary else GlassColors.textSecondary,
-                    fontSize = 14.sp,
-                    fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal
+                    color = if (selected) Color.White else GlassColors.textSecondary,
+                    fontSize = 12.sp,
+                    fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium
                 )
             }
         }
@@ -190,45 +189,49 @@ private fun QuickActions(
     onOpenStats: () -> Unit,
 ) {
     val items = listOf(
-        Triple("排名", GlassColors.accentBlue) { onOpenRanking() },
-        Triple("对比", GlassColors.accentPink) { onOpenCompare() },
-        Triple("比赛", GlassColors.accentMint) { onOpenMatches() },
-        Triple("图表", GlassColors.accentViolet) { onOpenStats() },
+        Quad("排名", GlassColors.accentBlue) { onOpenRanking() },
+        Quad("对比", GlassColors.accentPink) { onOpenCompare() },
+        Quad("比赛", GlassColors.accentMint) { onOpenMatches() },
+        Quad("图表", GlassColors.accentViolet) { onOpenStats() },
     )
-
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
         items.forEach { (label, color, onClick) ->
             Box(
                 Modifier
                     .weight(1f)
-                    .height(76.dp)
-                    .clip(RoundedCornerShape(20.dp))
-                    .background(color.copy(alpha = 0.18f))
+                    .height(82.dp)
+                    .shadow(6.dp, RoundedCornerShape(18.dp), clip = false)
+                    .clip(RoundedCornerShape(18.dp))
+                    .background(Color.White.copy(alpha = 0.8f))
                     .clickable { onClick() }
-                    .padding(8.dp),
+                    .padding(10.dp),
                 contentAlignment = Alignment.Center
             ) {
-                Text(
-                    label,
-                    color = color,
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.Bold
-                )
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Box(
+                        Modifier
+                            .size(8.dp)
+                            .clip(CircleShape)
+                            .background(color)
+                    )
+                    Spacer(Modifier.height(6.dp))
+                    Text(label, color = GlassColors.textPrimary, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                }
             }
         }
     }
 }
 
+private data class Quad(val label: String, val color: Color, val onClick: () -> Unit)
+
 @Composable
 private fun FavoritesRow(teams: List<Team>, onTeamClick: (Team) -> Unit) {
     GlassCard(Modifier.fillMaxWidth()) {
-        Text(
-            "我的关注",
-            color = GlassColors.textPrimary,
-            fontSize = 17.sp,
-            fontWeight = FontWeight.Bold
-        )
-        Spacer(Modifier.height(10.dp))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("我的关注", color = GlassColors.textPrimary, fontSize = 17.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+            Text("${teams.size} 队", color = GlassColors.textSecondary, fontSize = 12.sp)
+        }
+        Spacer(Modifier.height(12.dp))
         LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             items(teams, key = { it.code }) { team ->
                 Column(
@@ -246,19 +249,8 @@ private fun FavoritesRow(teams: List<Team>, onTeamClick: (Team) -> Unit) {
                         contentScale = ContentScale.Crop
                     )
                     Spacer(Modifier.height(6.dp))
-                    Text(
-                        team.name,
-                        color = GlassColors.textPrimary,
-                        fontSize = 11.sp,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    Text(
-                        "#${team.rank}",
-                        color = GlassColors.accentGold,
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Bold
-                    )
+                    Text(team.name, color = GlassColors.textPrimary, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text("#${team.rank}", color = GlassColors.accentGold, fontSize = 10.sp, fontWeight = FontWeight.SemiBold)
                 }
             }
         }
@@ -277,27 +269,12 @@ private fun SpotlightMatches(
 
     GlassCard(Modifier.fillMaxWidth()) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                "今日焦点",
-                color = GlassColors.textPrimary,
-                fontSize = 17.sp,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.weight(1f)
-            )
-            Text(
-                "${playing.size + upcoming.size + finished.size} 场",
-                color = GlassColors.textSecondary,
-                fontSize = 12.sp
-            )
+            Text("今日焦点", color = GlassColors.textPrimary, fontSize = 17.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+            Text("${playing.size + upcoming.size + finished.size} 场", color = GlassColors.textSecondary, fontSize = 12.sp)
         }
-        Spacer(Modifier.height(10.dp))
-
+        Spacer(Modifier.height(12.dp))
         if (playing.isEmpty() && upcoming.isEmpty() && finished.isEmpty()) {
-            Text(
-                "当前窗口暂无焦点比赛",
-                color = GlassColors.textSecondary,
-                fontSize = 13.sp
-            )
+            Text("当前窗口暂无焦点比赛", color = GlassColors.textSecondary, fontSize = 13.sp)
         } else {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 playing.forEach { MatchRow(it, { onMatchClick(it) }, "进行中") }
@@ -309,16 +286,12 @@ private fun SpotlightMatches(
 }
 
 @Composable
-private fun MatchRow(
-    m: MatchInfo,
-    onClick: () -> Unit,
-    badge: String,
-) {
+private fun MatchRow(m: MatchInfo, onClick: () -> Unit, badge: String) {
     Row(
         Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(14.dp))
-            .background(Color.White.copy(alpha = 0.06f))
+            .background(Color.White.copy(alpha = 0.6f))
             .clickable { onClick() }
             .padding(horizontal = 12.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically
@@ -329,37 +302,23 @@ private fun MatchRow(
                 AsyncImage(
                     model = homeFlag,
                     contentDescription = m.homeName,
-                    modifier = Modifier.size(22.dp).clip(CircleShape),
+                    modifier = Modifier.size(20.dp).clip(CircleShape),
                     contentScale = ContentScale.Crop
                 )
-                Spacer(Modifier.width(8.dp))
-                Text(
-                    m.homeName,
-                    color = GlassColors.textPrimary,
-                    fontSize = 13.sp,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f)
-                )
+                Spacer(Modifier.width(6.dp))
+                Text(m.homeName, color = GlassColors.textPrimary, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
             }
-            Spacer(Modifier.height(6.dp))
+            Spacer(Modifier.height(4.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
                 val awayFlag = m.awayCode.takeIf { it.isNotEmpty() }?.let { "https://api.fifa.com/api/v3/picture/flags-sq-3/$it" }
                 AsyncImage(
                     model = awayFlag,
                     contentDescription = m.awayName,
-                    modifier = Modifier.size(22.dp).clip(CircleShape),
+                    modifier = Modifier.size(20.dp).clip(CircleShape),
                     contentScale = ContentScale.Crop
                 )
-                Spacer(Modifier.width(8.dp))
-                Text(
-                    m.awayName,
-                    color = GlassColors.textPrimary,
-                    fontSize = 13.sp,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f)
-                )
+                Spacer(Modifier.width(6.dp))
+                Text(m.awayName, color = GlassColors.textPrimary, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
             }
         }
 
@@ -369,12 +328,12 @@ private fun MatchRow(
                     .clip(RoundedCornerShape(8.dp))
                     .background(
                         when (badge) {
-                            "进行中" -> GlassColors.up.copy(alpha = 0.2f)
-                            "即将开始" -> GlassColors.accentGold.copy(alpha = 0.2f)
-                            else -> GlassColors.textSecondary.copy(alpha = 0.2f)
+                            "进行中" -> GlassColors.up.copy(alpha = 0.15f)
+                            "即将开始" -> GlassColors.accentGold.copy(alpha = 0.15f)
+                            else -> Color.White.copy(alpha = 0.5f)
                         }
                     )
-                    .padding(horizontal = 8.dp, vertical = 3.dp)
+                    .padding(horizontal = 6.dp, vertical = 2.dp)
             ) {
                 Text(
                     badge,
@@ -383,145 +342,92 @@ private fun MatchRow(
                         "即将开始" -> GlassColors.accentGold
                         else -> GlassColors.textSecondary
                     },
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.Bold
+                    fontSize = 9.sp,
+                    fontWeight = FontWeight.SemiBold
                 )
             }
-            Spacer(Modifier.height(6.dp))
+            Spacer(Modifier.height(2.dp))
             if (m.homeScore != null && m.awayScore != null) {
                 Text(
                     "${m.homeScore} : ${m.awayScore}",
                     color = GlassColors.textPrimary,
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Black
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold
                 )
             } else {
-                Text(
-                    m.date.substring(11, 16).takeIf { m.date.length >= 16 } ?: "--:--",
-                    color = GlassColors.textSecondary,
-                    fontSize = 13.sp
-                )
+                Text("VS", color = GlassColors.textSecondary, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
             }
         }
     }
 }
 
 @Composable
-private fun Top3Card(top3: List<Team>, onTeamClick: (Team) -> Unit) {
-    GlassCard(Modifier.fillMaxWidth(), corner = 24.dp) {
-        Text(
-            "世界前三",
-            color = GlassColors.textPrimary,
-            fontSize = 17.sp,
-            fontWeight = FontWeight.Bold
-        )
-        Spacer(Modifier.height(10.dp))
-        Row(
-            Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceEvenly,
-            verticalAlignment = Alignment.Bottom
-        ) {
-            PodiumItemHome(top3[1], "\uD83E\uDD48", GlassColors.textSecondary, 0.9f, onTeamClick)
-            PodiumItemHome(top3[0], "\uD83E\uDD47", GlassColors.accentGold, 1.15f, onTeamClick)
-            PodiumItemHome(top3[2], "\uD83E\uDD49", Color(0xFFE8A87C), 0.82f, onTeamClick)
+private fun Top3Card(teams: List<Team>, onTeamClick: (Team) -> Unit) {
+    GlassCard(Modifier.fillMaxWidth()) {
+        Text("世界前三", color = GlassColors.textPrimary, fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
+        Spacer(Modifier.height(14.dp))
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+            teams.forEachIndexed { idx, team ->
+                val medal = when (idx) {
+                    0 -> "\uD83E\uDD47"
+                    1 -> "\uD83E\uDD48"
+                    2 -> "\uD83E\uDD49"
+                    else -> ""
+                }
+                val medalColor = when (idx) {
+                    0 -> GlassColors.accentGold
+                    1 -> Color(0xFFC0C0C0)
+                    2 -> Color(0xFFCD7F32)
+                    else -> GlassColors.textSecondary
+                }
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier
+                        .weight(1f)
+                        .clip(RoundedCornerShape(14.dp))
+                        .clickable { onTeamClick(team) }
+                        .padding(8.dp)
+                ) {
+                    Text(medal, fontSize = 28.sp, color = medalColor)
+                    Spacer(Modifier.height(4.dp))
+                    AsyncImage(
+                        model = team.flagUrl,
+                        contentDescription = team.name,
+                        modifier = Modifier.size(40.dp).clip(CircleShape),
+                        contentScale = ContentScale.Crop
+                    )
+                    Spacer(Modifier.height(6.dp))
+                    Text(team.name, color = GlassColors.textPrimary, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.SemiBold)
+                    Text("${"%.1f".format(team.points)} pts", color = GlassColors.textSecondary, fontSize = 10.sp)
+                }
+            }
         }
-    }
-}
-
-@Composable
-private fun PodiumItemHome(
-    team: Team,
-    medal: String,
-    accent: Color,
-    scale: Float,
-    onTeamClick: (Team) -> Unit,
-) {
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier
-            .clip(RoundedCornerShape(16.dp))
-            .clickable { onTeamClick(team) }
-            .padding(6.dp)
-    ) {
-        Text(medal, fontSize = (22 * scale).sp)
-        Spacer(Modifier.height(4.dp))
-        AsyncImage(
-            model = team.flagUrl,
-            contentDescription = team.name,
-            modifier = Modifier.size((44 * scale).dp).clip(CircleShape),
-            contentScale = ContentScale.Crop
-        )
-        Spacer(Modifier.height(6.dp))
-        Text(
-            team.name,
-            color = GlassColors.textPrimary,
-            fontSize = (13 * scale).sp,
-            fontWeight = FontWeight.Bold,
-            maxLines = 1
-        )
-        Text(
-            "%.0f 分".format(team.points),
-            color = accent,
-            fontSize = (11 * scale).sp
-        )
     }
 }
 
 @Composable
 private fun CompetitionsRow(competitions: List<Competition>, onOpenCompetitions: () -> Unit) {
-    val featured = remember(competitions) {
-        val priority = listOf("WC", "World Cup", "EURO", "Copa", "Asian Cup", "Africa Cup", "Gold Cup")
-        val picked = competitions
-            .filter { c -> priority.any { p -> c.name.contains(p, ignoreCase = true) } }
-            .take(5)
-        if (picked.isNotEmpty()) picked else competitions.take(5)
-    }
-
     GlassCard(Modifier.fillMaxWidth()) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                "热门赛事",
-                color = GlassColors.textPrimary,
-                fontSize = 17.sp,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.weight(1f)
-            )
-            Box(
-                Modifier
-                    .clip(RoundedCornerShape(10.dp))
-                    .background(GlassColors.accentBlue.copy(alpha = 0.15f))
-                    .clickable { onOpenCompetitions() }
-                    .padding(horizontal = 10.dp, vertical = 4.dp)
-            ) {
-                Text(
-                    "全部",
-                    color = GlassColors.accentBlue,
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Bold
-                )
-            }
+            Text("热门赛事", color = GlassColors.textPrimary, fontSize = 17.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+            Text("全部 ›", color = GlassColors.accentBlue, fontSize = 12.sp, modifier = Modifier.clickable { onOpenCompetitions() })
         }
-        Spacer(Modifier.height(10.dp))
-        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            items(featured, key = { it.id }) { comp ->
-                Box(
-                    Modifier
-                        .width(140.dp)
-                        .height(80.dp)
-                        .clip(RoundedCornerShape(16.dp))
-                        .background(GlassColors.accentViolet.copy(alpha = 0.12f))
+        Spacer(Modifier.height(12.dp))
+        LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            items(competitions.take(8), key = { it.id }) { c ->
+                Column(
+                    modifier = Modifier
+                        .width(120.dp)
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(Brush.linearGradient(listOf(GlassColors.accentBlue.copy(alpha = 0.12f), GlassColors.accentViolet.copy(alpha = 0.08f))))
                         .clickable { onOpenCompetitions() }
-                        .padding(12.dp),
-                    contentAlignment = Alignment.BottomStart
+                        .padding(12.dp)
                 ) {
-                    Text(
-                        comp.name,
-                        color = GlassColors.textPrimary,
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Bold,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis
-                    )
+                    Text(c.name, color = GlassColors.textPrimary, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis, lineHeight = 16.sp)
+                    if (c.region.isNotEmpty()) {
+                        Spacer(Modifier.height(4.dp))
+                        Text(c.region, color = GlassColors.textSecondary, fontSize = 10.sp, maxLines = 1)
+                    }
                 }
             }
         }

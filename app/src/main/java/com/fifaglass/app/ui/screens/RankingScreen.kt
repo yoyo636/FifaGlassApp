@@ -6,6 +6,7 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.ui.draw.shadow
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -63,13 +64,12 @@ fun RankingScreen(
     var query by remember { mutableStateOf("") }
     var confed by remember { mutableStateOf("全部") }
 
-    Column(Modifier.fillMaxSize().padding(horizontal = 16.dp)) {
+    Column(Modifier.fillMaxSize().padding(horizontal = 20.dp)) {
         Spacer(Modifier.height(8.dp))
         Text(
             "世界排名",
             color = GlassColors.textPrimary,
-            fontSize = 32.sp,
-            fontWeight = FontWeight.Bold
+            fontSize = 28.sp, fontWeight = FontWeight.SemiBold
         )
         Text(
             "FIFA/Coca-Cola 官方数据 · 内部接口直取",

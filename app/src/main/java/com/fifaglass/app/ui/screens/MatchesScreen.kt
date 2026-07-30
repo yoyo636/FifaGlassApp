@@ -2,6 +2,7 @@ package com.fifaglass.app.ui.screens
 
 import android.content.Intent
 import androidx.compose.foundation.background
+import androidx.compose.ui.draw.shadow
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -101,15 +102,14 @@ fun MatchesScreen(
 
     var query by remember { mutableStateOf("") }
 
-    Column(Modifier.fillMaxSize().padding(horizontal = 16.dp)) {
+    Column(Modifier.fillMaxSize().padding(horizontal = 20.dp)) {
         Spacer(Modifier.height(8.dp))
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text(
                     "实时比赛",
                     color = GlassColors.textPrimary,
-                    fontSize = 32.sp,
-                    fontWeight = FontWeight.Bold
+                    fontSize = 28.sp, fontWeight = FontWeight.SemiBold
                 )
                 Text(
                     if (lastRefresh.isEmpty()) "比分 · 胜率预测 · 实时表现评分" 

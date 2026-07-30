@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.shadow
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
@@ -126,10 +127,10 @@ fun SettingsScreen() {
     var showAbout by remember { mutableStateOf(false) }
 
     Column(
-        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp)
+        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp)
     ) {
         Spacer(Modifier.height(8.dp))
-        Text("设置", color = GlassColors.textPrimary, fontSize = 32.sp, fontWeight = FontWeight.Bold)
+        Text("设置", color = GlassColors.textPrimary, fontSize = 28.sp, fontWeight = FontWeight.SemiBold)
         Text("个性化 · 通知 · 数据 · 关于", color = GlassColors.textSecondary, fontSize = 13.sp)
         Spacer(Modifier.height(14.dp))
 
@@ -225,10 +226,10 @@ fun SettingsScreen() {
         GlassCard(Modifier.fillMaxWidth()) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text("关于", color = GlassColors.textPrimary, fontSize = 17.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-                Text("v1.4", color = GlassColors.textSecondary, fontSize = 13.sp)
+                Text("v2.0.1", color = GlassColors.textSecondary, fontSize = 13.sp)
             }
             Spacer(Modifier.height(10.dp))
-            AboutRow("版本号", "1.4 (build 3)")
+            AboutRow("版本号", "2.0.1 (build 7)")
             AboutRow("数据来源", "FIFA 官方接口")
             AboutRow("开源协议", "MIT License")
             AboutRow("启动次数", "${SettingsStore.openCount}")

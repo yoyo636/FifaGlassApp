@@ -3,6 +3,7 @@ package com.fifaglass.app.ui.screens
 import android.content.Intent
 import android.net.Uri
 import androidx.compose.foundation.background
+import androidx.compose.ui.draw.shadow
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -92,7 +93,7 @@ fun LiveStreamScreen(match: MatchInfo?) {
 
     val current = selectedChannel
 
-    Column(Modifier.fillMaxSize().padding(horizontal = 16.dp)) {
+    Column(Modifier.fillMaxSize().padding(horizontal = 20.dp)) {
         Spacer(Modifier.height(8.dp))
         Text(
             if (match != null) "直播观看" else "体育直播",

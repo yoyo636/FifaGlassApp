@@ -1,5 +1,6 @@
 package com.fifaglass.app.ui.screens
 
+import androidx.compose.ui.draw.shadow
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -30,14 +31,13 @@ fun StatsScreen(teams: List<Team>?, error: String?) {
         Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(horizontal = 16.dp)
+            .padding(horizontal = 20.dp)
     ) {
         Spacer(Modifier.height(8.dp))
         Text(
             "数据可视化",
             color = GlassColors.textPrimary,
-            fontSize = 32.sp,
-            fontWeight = FontWeight.Bold
+            fontSize = 28.sp, fontWeight = FontWeight.SemiBold
         )
         Text(
             "积分榜 · 洲分布 · 走势榜",

@@ -6,95 +6,120 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
-/** 液态玻璃（Liquid Glass）视觉体系：深色底 + 彩色光斑 + 半透明高光玻璃卡片 */
 object GlassColors {
-    val bgTop = Color(0xFF0A0F1E)
-    val bgBottom = Color(0xFF141C33)
-    val cardHi = Color.White.copy(alpha = 0.14f)
-    val cardLo = Color.White.copy(alpha = 0.05f)
-    val strokeHi = Color.White.copy(alpha = 0.45f)
-    val strokeLo = Color.White.copy(alpha = 0.08f)
-    val textPrimary = Color.White
-    val textSecondary = Color.White.copy(alpha = 0.62f)
-    val accentBlue = Color(0xFF7C9EFF)
-    val accentMint = Color(0xFF4AE3C7)
-    val accentPink = Color(0xFFFF8FB2)
-    val accentGold = Color(0xFFFFD57C)
-    val accentViolet = Color(0xFFB49CFF)
-    val up = Color(0xFF5BE49B)
-    val down = Color(0xFFFF7A7A)
+    val bgBase = Color(0xFFFAFAFC)
+    val bgBaseDark = Color(0xFF1A1A1F)
+    val cardSurface = Color.White
+    val cardSurfaceDark = Color(0xFF2A2A30)
+    val glassTint = Color(0xFFF5F5F7)
+    val glassTintDark = Color(0xFF2C2C32)
+    val strokeLight = Color(0x14000000)
+    val strokeDark = Color(0x22FFFFFF)
+    val textPrimary = Color(0xFF1D1D1F)
+    val textPrimaryDark = Color(0xFFF5F5F7)
+    val textSecondary = Color(0xFF6E6E73)
+    val textSecondaryDark = Color(0xFF98989D)
+
+    val accentBlue = Color(0xFF007AFF)
+    val accentMint = Color(0xFF34C759)
+    val accentPink = Color(0xFFFF2D55)
+    val accentGold = Color(0xFFFF9500)
+    val accentViolet = Color(0xFFAF52DE)
+    val accentTeal = Color(0xFF5AC8FA)
+    val up = Color(0xFF34C759)
+    val down = Color(0xFFFF3B30)
 }
 
-fun Modifier.glass(corner: Dp = 24.dp): Modifier {
+data class GlassTheme(
+    val isDark: Boolean = false,
+)
+
+val LocalGlassTheme = staticCompositionLocalOf { GlassTheme() }
+
+fun Modifier.liquidGlass(corner: Dp = 20.dp, theme: GlassTheme = GlassTheme()): Modifier {
     val shape = RoundedCornerShape(corner)
+    val tint = if (theme.isDark) GlassColors.glassTintDark else GlassColors.glassTint
+    val stroke = if (theme.isDark) GlassColors.strokeDark else GlassColors.strokeLight
     return this
         .clip(shape)
-        .background(Brush.verticalGradient(listOf(GlassColors.cardHi, GlassColors.cardLo)))
-        .border(
-            1.dp,
-            Brush.verticalGradient(listOf(GlassColors.strokeHi, GlassColors.strokeLo)),
-            shape
-        )
+        .background(tint.copy(alpha = 0.72f))
+        .border(0.5.dp, stroke, shape)
 }
 
 @Composable
 fun GlassCard(
     modifier: Modifier = Modifier,
-    corner: Dp = 24.dp,
+    corner: Dp = 20.dp,
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    Column(modifier = modifier.glass(corner).padding(16.dp), content = content)
+    val theme = LocalGlassTheme.current
+    Column(modifier = modifier.liquidGlass(corner, theme).padding(16.dp), content = content)
 }
 
-/** 全局背景：深色渐变 + 三团彩色径向光斑，透过玻璃卡片产生"液态"感 */
 @Composable
 fun GlassBackground(modifier: Modifier = Modifier, content: @Composable () -> Unit) {
+    val theme = LocalGlassTheme.current
+    val baseColor = if (theme.isDark) GlassColors.bgBaseDark else GlassColors.bgBase
+    val accent1 = if (theme.isDark) Color(0xFF0A84FF).copy(alpha = 0.18f) else Color(0xFF007AFF).copy(alpha = 0.06f)
+    val accent2 = if (theme.isDark) Color(0xFF30D158).copy(alpha = 0.12f) else Color(0xFF34C759).copy(alpha = 0.05f)
+    val accent3 = if (theme.isDark) Color(0xFFFF453A).copy(alpha = 0.10f) else Color(0xFFFF2D55).copy(alpha = 0.04f)
     Box(
-        modifier.background(
-            Brush.verticalGradient(listOf(GlassColors.bgTop, GlassColors.bgBottom))
-        )
+        modifier.background(baseColor)
     ) {
         Canvas(Modifier.fillMaxSize()) {
             drawCircle(
                 brush = Brush.radialGradient(
-                    colors = listOf(Color(0xFF3B5BDB).copy(alpha = 0.50f), Color.Transparent),
-                    center = Offset(size.width * 0.12f, size.height * 0.16f),
+                    colors = listOf(accent1, Color.Transparent),
+                    center = Offset(size.width * 0.15f, size.height * 0.1f),
+                    radius = size.width * 0.9f,
+                ),
+                radius = size.width * 0.9f,
+                center = Offset(size.width * 0.15f, size.height * 0.1f),
+            )
+            drawCircle(
+                brush = Brush.radialGradient(
+                    colors = listOf(accent2, Color.Transparent),
+                    center = Offset(size.width * 0.9f, size.height * 0.35f),
                     radius = size.width * 0.75f,
                 ),
                 radius = size.width * 0.75f,
-                center = Offset(size.width * 0.12f, size.height * 0.16f),
+                center = Offset(size.width * 0.9f, size.height * 0.35f),
             )
             drawCircle(
                 brush = Brush.radialGradient(
-                    colors = listOf(Color(0xFF0CA678).copy(alpha = 0.32f), Color.Transparent),
-                    center = Offset(size.width * 0.95f, size.height * 0.42f),
-                    radius = size.width * 0.7f,
-                ),
-                radius = size.width * 0.7f,
-                center = Offset(size.width * 0.95f, size.height * 0.42f),
-            )
-            drawCircle(
-                brush = Brush.radialGradient(
-                    colors = listOf(Color(0xFFD6336C).copy(alpha = 0.28f), Color.Transparent),
-                    center = Offset(size.width * 0.35f, size.height * 0.95f),
+                    colors = listOf(accent3, Color.Transparent),
+                    center = Offset(size.width * 0.5f, size.height * 0.85f),
                     radius = size.width * 0.8f,
                 ),
                 radius = size.width * 0.8f,
-                center = Offset(size.width * 0.35f, size.height * 0.95f),
+                center = Offset(size.width * 0.5f, size.height * 0.85f),
             )
         }
         content()
     }
 }
+
+@Composable
+fun ProvideGlassTheme(isDark: Boolean, content: @Composable () -> Unit) {
+    CompositionLocalProvider(LocalGlassTheme provides GlassTheme(isDark)) {
+        content()
+    }
+}
+
+@Composable
+fun Modifier.glass(corner: Dp = 20.dp): Modifier = this.liquidGlass(corner, LocalGlassTheme.current)

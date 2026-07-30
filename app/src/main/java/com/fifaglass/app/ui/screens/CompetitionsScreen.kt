@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.shadow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
@@ -58,9 +59,9 @@ fun CompetitionsScreen(
         }
     }
 
-    Column(Modifier.fillMaxSize().padding(horizontal = 16.dp)) {
+    Column(Modifier.fillMaxSize().padding(horizontal = 20.dp)) {
         Spacer(Modifier.height(8.dp))
-        Text("赛事中心", color = GlassColors.textPrimary, fontSize = 32.sp, fontWeight = FontWeight.Bold)
+        Text("赛事中心", color = GlassColors.textPrimary, fontSize = 28.sp, fontWeight = FontWeight.SemiBold)
         Text("全球联赛与杯赛 · 点击查看近期赛程", color = GlassColors.textSecondary, fontSize = 13.sp)
         Spacer(Modifier.height(14.dp))
 
@@ -141,7 +142,7 @@ fun CompetitionMatchesScreen(
         }
     }
 
-    Column(Modifier.fillMaxSize().padding(horizontal = 16.dp)) {
+    Column(Modifier.fillMaxSize().padding(horizontal = 20.dp)) {
         Spacer(Modifier.height(8.dp))
         Text(
             competition.name,

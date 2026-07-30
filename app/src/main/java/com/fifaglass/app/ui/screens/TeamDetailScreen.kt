@@ -26,6 +26,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.background
+import androidx.compose.ui.draw.shadow
 import androidx.compose.foundation.clickable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
@@ -64,7 +65,7 @@ fun TeamDetailScreen(team: Team, all: List<Team>, onMatchClick: (MatchInfo) -> U
         Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(horizontal = 16.dp)
+            .padding(horizontal = 20.dp)
     ) {
         Spacer(Modifier.height(8.dp))
         GlassCard(Modifier.fillMaxWidth()) {
