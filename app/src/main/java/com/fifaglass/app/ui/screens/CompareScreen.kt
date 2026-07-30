@@ -433,9 +433,10 @@ private fun FullPredictionSection(a: Team, b: Team, p: PredictionOutput) {
             fontWeight = FontWeight.Bold
         )
         Spacer(Modifier.height(10.dp))
-        MarketRow("主胜", "${p.monteCarlo.homeWins} 次（${p.monteCarlo.homeWins * 100 / p.monteCarlo.simulations}%）")
-        MarketRow("平局", "${p.monteCarlo.draws} 次（${p.monteCarlo.draws * 100 / p.monteCarlo.simulations}%）")
-        MarketRow("客胜", "${p.monteCarlo.awayWins} 次（${p.monteCarlo.awayWins * 100 / p.monteCarlo.simulations}%）")
+        val sims = p.monteCarlo.simulations.coerceAtLeast(1)
+        MarketRow("主胜", "${p.monteCarlo.homeWins} 次（${p.monteCarlo.homeWins * 100 / sims}%）")
+        MarketRow("平局", "${p.monteCarlo.draws} 次（${p.monteCarlo.draws * 100 / sims}%）")
+        MarketRow("客胜", "${p.monteCarlo.awayWins} 次（${p.monteCarlo.awayWins * 100 / sims}%）")
         MarketRow("场均总进球", "%.2f".format(p.monteCarlo.avgTotalGoals))
         MarketRow("最大主胜", p.monteCarlo.biggestHomeWin)
         MarketRow("最大客胜", p.monteCarlo.biggestAwayWin)

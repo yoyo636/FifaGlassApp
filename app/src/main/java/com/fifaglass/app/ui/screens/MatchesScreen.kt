@@ -89,13 +89,6 @@ fun MatchesScreen(
         }
     }
 
-    LaunchedEffect(Unit) {
-        while (true) {
-            kotlinx.coroutines.delay(1_000)
-            refreshTick++
-        }
-    }
-
     val pointsByCode = remember(rankings) {
         rankings?.associate { it.code to it.points } ?: emptyMap()
     }

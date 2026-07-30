@@ -53,8 +53,8 @@ object SettingsStore {
     }
 
     var themeMode: String
-        get() = prefs.getString("theme_mode", "dark") ?: "dark"
-        set(v) { prefs.edit().putString("theme_mode", v).apply() }
+        get() = if (::prefs.isInitialized) prefs.getString("theme_mode", "dark") ?: "dark" else "dark"
+        set(v) { if (::prefs.isInitialized) prefs.edit().putString("theme_mode", v).apply() }
 
     var fontScale: Float
         get() = prefs.getFloat("font_scale", 1.0f)

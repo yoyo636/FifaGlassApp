@@ -52,7 +52,7 @@ fun StatsScreen(teams: List<Team>?, error: String?) {
             teams == null -> LoadingBox()
             else -> {
                 val top20 = teams.take(20)
-                val maxPts = top20.maxOf { it.points }
+                val maxPts = top20.maxOfOrNull { it.points } ?: 0.0
 
                 GlassCard(Modifier.fillMaxWidth()) {
                     SectionTitle("Top 20 积分")

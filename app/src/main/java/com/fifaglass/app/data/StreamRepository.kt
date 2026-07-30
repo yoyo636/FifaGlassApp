@@ -6,6 +6,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
+import java.util.concurrent.ConcurrentHashMap
 
 data class StreamChannel(
     val id: String,
@@ -33,7 +34,6 @@ object StreamRepository {
     private const val IPTV_CHANNELS = "https://iptv-org.github.io/api/channels.json"
     private const val IPTV_STREAMS = "https://iptv-org.github.io/api/streams.json"
     private const val IPTV_SPORTS_M3U = "https://iptv-org.github.io/iptv/categories/sports.m3u"
-
     private const val FREE_TV_M3U = "https://raw.githubusercontent.com/Free-TV/IPTV/master/playlist.m3u8"
 
     private val extraSources = listOf(
@@ -42,20 +42,24 @@ object StreamRepository {
         StreamSource("iptv-org API", "", "json"),
     )
 
-    var cachedChannels: List<StreamChannel>? = null
+    @Volatile
+    private var cachedChannels: List<StreamChannel>? = null
+    private var lastFetchMs: Long = 0L
+    private const val CACHE_TTL_MS = 30 * 60 * 1000L
+
     private var favPrefs: SharedPreferences? = null
 
     fun initFavorites(context: Context) {
         if (favPrefs == null) {
-            favPrefs = context.getSharedPreferences("fav_channels", Context.MODE_PRIVATE)
+            favPrefs = context.applicationContext.getSharedPreferences("fav_channels", Context.MODE_PRIVATE)
         }
     }
 
     fun toggleFavorite(url: String) {
         val prefs = favPrefs ?: return
-        val set = prefs.getStringSet("favorites", setOf()) ?: setOf()
-        val newSet = if (url in set) set - url else set + url
-        prefs.edit().putStringSet("favorites", newSet).apply()
+        val set = (prefs.getStringSet("favorites", setOf()) ?: setOf()).toMutableSet()
+        if (url in set) set.remove(url) else set.add(url)
+        prefs.edit().putStringSet("favorites", set).apply()
     }
 
     fun isFavorite(url: String): Boolean {
@@ -68,10 +72,61 @@ object StreamRepository {
         return prefs.getStringSet("favorites", setOf()) ?: emptySet()
     }
 
-    /** 从 iptv-org JSON API 获取体育频道（channels.json + streams.json 关联） */
-    fun fetchSportsChannels(): List<StreamChannel> {
-        cachedChannels?.let { return it }
+    val presetChannels: List<StreamChannel> = listOf(
+        StreamChannel("fifa-plus", "FIFA+ 官方", "https://www.fifa.com/fifaplus/en/tournaments", "", "INT", "football", "1080p", "", UA),
+        StreamChannel("cctv5", "CCTV-5 体育频道", IPTV_SPORTS_M3U, "", "CN", "sports", "1080p", "", UA),
+        StreamChannel("espn", "ESPN 体育", IPTV_SPORTS_M3U, "", "US", "sports", "1080p", "", UA),
+        StreamChannel("skysports", "Sky Sports", IPTV_SPORTS_M3U, "", "GB", "sports", "1080p", "", UA),
+        StreamChannel("beinsports", "beIN Sports", IPTV_SPORTS_M3U, "", "FR", "sports", "1080p", "", UA),
+        StreamChannel("eurosport", "Eurosport", IPTV_SPORTS_M3U, "", "EU", "sports", "1080p", "", UA),
+    )
 
+    fun quickChannels(): List<StreamChannel> {
+        val cached = cachedChannels
+        return if (cached.isNullOrEmpty()) presetChannels else presetChannels + cached
+    }
+
+    suspend fun loadAllAsync(): List<StreamChannel> {
+        val now = System.currentTimeMillis()
+        val cached = cachedChannels
+        if (!cached.isNullOrEmpty() && now - lastFetchMs < CACHE_TTL_MS) {
+            return presetChannels + cached
+        }
+        return try {
+            val all = fetchAllInternal()
+            cachedChannels = all
+            lastFetchMs = System.currentTimeMillis()
+            presetChannels + all
+        } catch (_: Exception) {
+            cached ?: emptyList()
+        }
+    }
+
+    fun fetchAllSportsStreams(): List<StreamChannel> = quickChannels()
+
+    private fun fetchAllInternal(): List<StreamChannel> {
+        val result = ConcurrentHashMap.newKeySet<String>()
+        val channels = java.util.Collections.synchronizedList(mutableListOf<StreamChannel>())
+
+        val tasks = listOf(
+            { runCatching { fetchSportsChannelsInternal() }.getOrNull() },
+            { runCatching { fetchFromM3U(IPTV_SPORTS_M3U) }.getOrNull() },
+            { runCatching { fetchFromM3U(FREE_TV_M3U) }.getOrNull() },
+        )
+
+        for (task in tasks) {
+            val list = task() ?: continue
+            for (ch in list) {
+                if (result.add(ch.url)) channels.add(ch)
+            }
+        }
+
+        return channels.toList()
+    }
+
+    fun fetchSportsChannels(): List<StreamChannel> = fetchSportsChannelsInternal()
+
+    private fun fetchSportsChannelsInternal(): List<StreamChannel> {
         val channelsJson = fetchJson(IPTV_CHANNELS)
         val streamsJson = fetchJson(IPTV_STREAMS)
 
@@ -82,7 +137,9 @@ object StreamRepository {
         for (i in 0 until streams.length()) {
             val s = streams.getJSONObject(i)
             val chId = s.optString("channel")
-            streamMap.getOrPut(chId) { mutableListOf() }.add(s)
+            if (chId.isNotEmpty()) {
+                streamMap.getOrPut(chId) { mutableListOf() }.add(s)
+            }
         }
 
         val result = mutableListOf<StreamChannel>()
@@ -91,11 +148,12 @@ object StreamRepository {
             val categories = ch.optJSONArray("categories") ?: continue
             var isSports = false
             for (j in 0 until categories.length()) {
-                if (categories.getString(j) == "sports") { isSports = true; break }
+                if (categories.optString(j) == "sports") { isSports = true; break }
             }
             if (!isSports) continue
 
             val chId = ch.optString("id")
+            if (chId.isEmpty()) continue
             val name = ch.optString("name").ifEmpty { chId }
             val logo = ch.optString("logo", "")
             val country = ch.optString("country", "")
@@ -118,11 +176,9 @@ object StreamRepository {
             }
         }
 
-        cachedChannels = result
         return result
     }
 
-    /** 解析 M3U 播放列表 */
     fun parseM3U(raw: String): List<StreamChannel> {
         val channels = mutableListOf<StreamChannel>()
         val lines = raw.lines()
@@ -137,23 +193,25 @@ object StreamRepository {
                 val nameMatch = Regex(",(.+)$").find(trimmed)
                 currentName = nameMatch?.groupValues?.lastOrNull()?.trim() ?: ""
                 val logoMatch = Regex("tvg-logo=\"([^\"]+)\"").find(trimmed)
-                currentLogo = logoMatch?.groupValues?.get(1) ?: ""
+                currentLogo = logoMatch?.groupValues?.getOrNull(1) ?: ""
                 val groupMatch = Regex("group-title=\"([^\"]+)\"").find(trimmed)
-                currentGroup = groupMatch?.groupValues?.get(1) ?: ""
+                currentGroup = groupMatch?.groupValues?.getOrNull(1) ?: ""
                 val qualityMatch = Regex("tvg-quality=\"([^\"]+)\"").find(trimmed)
-                currentQuality = qualityMatch?.groupValues?.get(1) ?: ""
+                currentQuality = qualityMatch?.groupValues?.getOrNull(1) ?: ""
             } else if (trimmed.isNotEmpty() && !trimmed.startsWith("#")) {
-                channels.add(StreamChannel(
-                    id = currentName,
-                    name = currentName,
-                    url = trimmed,
-                    logo = currentLogo,
-                    country = "",
-                    category = currentGroup,
-                    quality = currentQuality,
-                    referrer = "",
-                    userAgent = UA,
-                ))
+                if (currentName.isNotEmpty()) {
+                    channels.add(StreamChannel(
+                        id = currentName,
+                        name = currentName,
+                        url = trimmed,
+                        logo = currentLogo,
+                        country = "",
+                        category = currentGroup,
+                        quality = currentQuality,
+                        referrer = "",
+                        userAgent = UA,
+                    ))
+                }
                 currentName = ""
                 currentLogo = ""
                 currentGroup = ""
@@ -162,30 +220,11 @@ object StreamRepository {
         return channels
     }
 
-    /** 从 M3U 源获取体育频道 */
     fun fetchFromM3U(url: String): List<StreamChannel> {
         val raw = fetchText(url)
         return parseM3U(raw)
     }
 
-    /** 综合获取所有体育流频道 */
-    fun fetchAllSportsStreams(): List<StreamChannel> {
-        val result = mutableListOf<StreamChannel>()
-
-        runCatching {
-            result.addAll(fetchSportsChannels())
-        }
-        runCatching {
-            result.addAll(fetchFromM3U(IPTV_SPORTS_M3U))
-        }
-        runCatching {
-            result.addAll(fetchFromM3U(FREE_TV_M3U))
-        }
-
-        return result.distinctBy { it.url }
-    }
-
-    /** 按关键词搜索频道 */
     fun searchChannels(channels: List<StreamChannel>, query: String): List<StreamChannel> {
         if (query.isBlank()) return channels
         val q = query.trim().lowercase()
@@ -196,27 +235,24 @@ object StreamRepository {
         }
     }
 
-    /** 根据比赛信息匹配可能的转播频道 */
     fun matchChannelsForMatch(channels: List<StreamChannel>, m: MatchInfo): List<StreamChannel> {
-        val keywords = mutableListOf(m.competition)
-        if (m.homeCode.isNotEmpty()) {
-            keywords.add(m.homeCode)
-            keywords.add(m.homeName)
-        }
-        if (m.awayCode.isNotEmpty()) {
-            keywords.add(m.awayCode)
-            keywords.add(m.awayName)
-        }
+        val keywords = mutableListOf<String>()
+        if (m.competition.isNotEmpty()) keywords.add(m.competition)
+        if (m.homeCode.isNotEmpty()) { keywords.add(m.homeCode); keywords.add(m.homeName) }
+        if (m.awayCode.isNotEmpty()) { keywords.add(m.awayCode); keywords.add(m.awayName) }
 
         val lowerKeywords = keywords.filter { it.isNotEmpty() }.map { it.lowercase() }
-        if (lowerKeywords.isEmpty()) return channels.filter { it.category.contains("sport", ignoreCase = true) }.take(20)
+        if (lowerKeywords.isEmpty()) {
+            return channels.filter { it.category.contains("sport", ignoreCase = true) }.take(20)
+        }
 
         val matched = channels.filter { ch ->
             val lowerName = ch.name.lowercase()
             lowerKeywords.any { kw -> lowerName.contains(kw) }
         }
 
-        return if (matched.isNotEmpty()) matched else channels.filter { it.category.contains("sport", ignoreCase = true) }.take(20)
+        return if (matched.isNotEmpty()) matched
+        else channels.filter { it.category.contains("sport", ignoreCase = true) }.take(20)
     }
 
     private fun fetchJson(url: String): String = fetchText(url)
@@ -224,10 +260,11 @@ object StreamRepository {
     private fun fetchText(url: String): String {
         val conn = (URL(url).openConnection() as HttpURLConnection).apply {
             requestMethod = "GET"
-            connectTimeout = 15000
-            readTimeout = 15000
+            connectTimeout = 6000
+            readTimeout = 8000
             setRequestProperty("User-Agent", UA)
             setRequestProperty("Accept", "*/*")
+            setRequestProperty("Connection", "close")
         }
         try {
             return conn.inputStream.bufferedReader().use { it.readText() }
@@ -236,32 +273,5 @@ object StreamRepository {
         }
     }
 
-    /** 获取可用的流源列表 */
     fun getSources(): List<StreamSource> = extraSources
-
-    /** 获取常用体育频道快捷列表 */
-    val presetChannels = listOf(
-        StreamChannel(
-            id = "fifa-plus",
-            name = "FIFA+ 官方直播",
-            url = "https://www.fifa.com/fifaplus/en/tournaments",
-            logo = "",
-            country = "INT",
-            category = "football",
-            quality = "1080p",
-            referrer = "",
-            userAgent = UA,
-        ),
-        StreamChannel(
-            id = "cctv5",
-            name = "CCTV-5 体育频道",
-            url = "https://iptv-org.github.io/iptv/categories/sports.m3u",
-            logo = "",
-            country = "CN",
-            category = "sports",
-            quality = "1080p",
-            referrer = "",
-            userAgent = UA,
-        ),
-    )
 }
