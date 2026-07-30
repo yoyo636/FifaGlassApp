@@ -33,6 +33,7 @@ import com.fifaglass.app.ui.screens.CompareScreen
 import com.fifaglass.app.ui.screens.CompetitionMatchesScreen
 import com.fifaglass.app.ui.screens.CompetitionsScreen
 import com.fifaglass.app.ui.screens.FullPool
+import com.fifaglass.app.ui.screens.HomeScreen
 import com.fifaglass.app.ui.screens.MatchDetailScreen
 import com.fifaglass.app.ui.screens.MatchesScreen
 import com.fifaglass.app.ui.screens.RankingScreen
@@ -42,6 +43,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 sealed interface Screen {
+    data object Home : Screen
     data object Ranking : Screen
     data object Compare : Screen
     data object Stats : Screen
@@ -54,13 +56,11 @@ sealed interface Screen {
 
 @Composable
 fun AppRoot() {
-    // 简单导航栈：栈顶为当前页
-    var stack by remember { mutableStateOf(listOf<Screen>(Screen.Ranking)) }
+    var stack by remember { mutableStateOf(listOf<Screen>(Screen.Home)) }
     fun navigate(s: Screen) { stack = stack + s }
     fun back() { if (stack.size > 1) stack = stack.dropLast(1) }
     fun toTab(s: Screen) { stack = listOf(s) }
 
-    // 安卓系统返回手势：从屏幕边缘侧滑返回上一页
     BackHandler(enabled = stack.size > 1) { back() }
 
     val context = LocalContext.current
@@ -95,6 +95,20 @@ fun AppRoot() {
         Box(Modifier.fillMaxSize().safeDrawingPadding()) {
             Crossfade(targetState = screen, label = "page") { s ->
                 when (s) {
+                    is Screen.Home -> HomeScreen(
+                        teams = current,
+                        gender = gender,
+                        onGenderChange = { gender = it },
+                        error = error,
+                        favorites = Favorites.codes,
+                        onTeamClick = { navigate(Screen.TeamDetail(it)) },
+                        onMatchClick = { navigate(Screen.MatchDetail(it)) },
+                        onOpenCompetitions = { navigate(Screen.Competitions) },
+                        onOpenRanking = { toTab(Screen.Ranking) },
+                        onOpenCompare = { toTab(Screen.Compare) },
+                        onOpenMatches = { toTab(Screen.Matches) },
+                        onOpenStats = { toTab(Screen.Stats) }
+                    )
                     is Screen.Ranking -> RankingScreen(
                         teams = current,
                         gender = gender,
@@ -132,7 +146,6 @@ fun AppRoot() {
                 }
             }
 
-            // 底部玻璃导航栏
             Row(
                 Modifier
                     .align(Alignment.BottomCenter)
@@ -142,6 +155,10 @@ fun AppRoot() {
                     .padding(vertical = 6.dp, horizontal = 4.dp),
                 horizontalArrangement = Arrangement.SpaceEvenly
             ) {
+                NavItem(
+                    "主页",
+                    screen is Screen.Home
+                ) { toTab(Screen.Home) }
                 NavItem(
                     "排名",
                     screen is Screen.Ranking || screen is Screen.TeamDetail
@@ -165,13 +182,13 @@ private fun NavItem(label: String, selected: Boolean, onClick: () -> Unit) {
             .clip(RoundedCornerShape(20.dp))
             .then(if (selected) Modifier.glass(20.dp) else Modifier)
             .clickable { onClick() }
-            .padding(horizontal = 18.dp, vertical = 10.dp),
+            .padding(horizontal = 14.dp, vertical = 10.dp),
         contentAlignment = Alignment.Center
     ) {
         Text(
             label,
             color = if (selected) GlassColors.textPrimary else GlassColors.textSecondary,
-            fontSize = 15.sp,
+            fontSize = 14.sp,
             fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal
         )
     }
