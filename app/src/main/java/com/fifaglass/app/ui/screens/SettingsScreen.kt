@@ -226,10 +226,10 @@ fun SettingsScreen() {
         GlassCard(Modifier.fillMaxWidth()) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text("关于", color = GlassColors.textPrimary, fontSize = 17.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-                Text("v2.0.1", color = GlassColors.textSecondary, fontSize = 13.sp)
+                Text("v2.1.0", color = GlassColors.textSecondary, fontSize = 13.sp)
             }
             Spacer(Modifier.height(10.dp))
-            AboutRow("版本号", "2.0.1 (build 7)")
+            AboutRow("版本号", "2.1.0 (build 8)")
             AboutRow("数据来源", "FIFA 官方接口")
             AboutRow("开源协议", "MIT License")
             AboutRow("启动次数", "${SettingsStore.openCount}")
