@@ -39,6 +39,7 @@ import com.fifaglass.app.ui.screens.LiveStreamScreen
 import com.fifaglass.app.ui.screens.MatchDetailScreen
 import com.fifaglass.app.ui.screens.MatchesScreen
 import com.fifaglass.app.ui.screens.RankingScreen
+import com.fifaglass.app.ui.screens.SearchScreen
 import com.fifaglass.app.ui.screens.SettingsScreen
 import com.fifaglass.app.ui.screens.SettingsStore
 import com.fifaglass.app.ui.screens.StatsScreen
@@ -55,6 +56,7 @@ sealed interface Screen {
     data object Competitions : Screen
     data object Settings : Screen
     data object LiveStream : Screen
+    data object Search : Screen
     data class TeamDetail(val team: Team) : Screen
     data class MatchDetail(val match: MatchInfo) : Screen
     data class Companion(val match: MatchInfo) : Screen
@@ -76,6 +78,7 @@ fun AppRoot() {
         Favorites.init(context)
         SettingsStore.init(context)
         SettingsStore.recordOpen()
+        com.fifaglass.app.data.StreamRepository.initFavorites(context)
     }
 
     var gender by remember { mutableStateOf(1) }
@@ -165,6 +168,12 @@ fun AppRoot() {
                     )
                     is Screen.Stream -> LiveStreamScreen(match = s.match)
                     is Screen.LiveStream -> LiveStreamScreen(match = null)
+                    is Screen.Search -> SearchScreen(
+                        teams = current,
+                        onTeamClick = { navigate(Screen.TeamDetail(it)) },
+                        onMatchClick = { navigate(Screen.MatchDetail(it)) },
+                        onCompetitionClick = { navigate(Screen.CompetitionMatches(it)) }
+                    )
                     is Screen.Settings -> SettingsScreen()
                 }
             }
@@ -180,6 +189,7 @@ fun AppRoot() {
             ) {
                 NavItem("主页", screen is Screen.Home) { toTab(Screen.Home) }
                 NavItem("排名", screen is Screen.Ranking || screen is Screen.TeamDetail) { toTab(Screen.Ranking) }
+                NavItem("搜索", screen is Screen.Search) { toTab(Screen.Search) }
                 NavItem("直播", screen is Screen.LiveStream || screen is Screen.Stream) { toTab(Screen.LiveStream) }
                 NavItem(
                     "比赛",

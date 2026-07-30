@@ -30,6 +30,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -69,6 +70,7 @@ fun LiveStreamScreen(match: MatchInfo?) {
     var error by remember { mutableStateOf<String?>(null) }
     var query by remember { mutableStateOf("") }
     var loading by remember { mutableStateOf(true) }
+    var favTick by remember { mutableIntStateOf(0) }
 
     LaunchedEffect(Unit) {
         loading = true
@@ -169,6 +171,23 @@ fun LiveStreamScreen(match: MatchInfo?) {
             }
             else -> {
                 val list = filteredChannels
+                val favUrls = remember(favTick) { StreamRepository.getFavoriteUrls() }
+                val favChannels = channels?.filter { it.url in favUrls } ?: emptyList()
+                if (favChannels.isNotEmpty() && query.isBlank()) {
+                    GlassCard(Modifier.fillMaxWidth()) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text("⭐ 收藏频道", color = GlassColors.accentGold, fontSize = 15.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                            Text("${favChannels.size} 个", color = GlassColors.textSecondary, fontSize = 12.sp)
+                        }
+                        Spacer(Modifier.height(8.dp))
+                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            favChannels.take(5).forEach { ch ->
+                                ChannelRow(ch, selectedChannel?.url == ch.url) { selectedChannel = ch }
+                            }
+                        }
+                    }
+                    Spacer(Modifier.height(10.dp))
+                }
                 if (list.isEmpty()) {
                     GlassCard(Modifier.fillMaxWidth()) {
                         Text("未找到频道", color = GlassColors.textSecondary, fontSize = 13.sp)
@@ -264,6 +283,7 @@ private fun VideoPlayerCard(channel: StreamChannel) {
 
 @Composable
 private fun ChannelRow(channel: StreamChannel, isSelected: Boolean, onClick: () -> Unit) {
+    var isFav by remember(channel.url) { mutableStateOf(StreamRepository.isFavorite(channel.url)) }
     GlassCard(
         modifier = Modifier.fillMaxWidth().clickable { onClick() },
         corner = 16.dp
@@ -300,6 +320,19 @@ private fun ChannelRow(channel: StreamChannel, isSelected: Boolean, onClick: () 
                     fontSize = 11.sp
                 )
             }
+            Box(
+                Modifier.clip(RoundedCornerShape(8.dp))
+                    .clickable {
+                        StreamRepository.toggleFavorite(channel.url)
+                        isFav = !isFav
+                    }
+                    .padding(horizontal = 6.dp, vertical = 4.dp)
+            ) {
+                Text(
+                    if (isFav) "⭐" else "☆",
+                    fontSize = 16.sp
+                )
+            }
             if (isSelected) {
                 Box(
                     Modifier.clip(RoundedCornerShape(8.dp))
@@ -314,7 +347,7 @@ private fun ChannelRow(channel: StreamChannel, isSelected: Boolean, onClick: () 
                         .background(GlassColors.accentGold.copy(alpha = 0.15f))
                         .padding(horizontal = 8.dp, vertical = 3.dp)
                 ) {
-                    Text("▶ 点击播放", color = GlassColors.accentGold, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                    Text("▶ 播放", color = GlassColors.accentGold, fontSize = 10.sp, fontWeight = FontWeight.Bold)
                 }
             }
         }

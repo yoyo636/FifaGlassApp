@@ -1,5 +1,7 @@
 package com.fifaglass.app.data
 
+import android.content.Context
+import android.content.SharedPreferences
 import org.json.JSONArray
 import org.json.JSONObject
 import java.net.HttpURLConnection
@@ -41,6 +43,30 @@ object StreamRepository {
     )
 
     var cachedChannels: List<StreamChannel>? = null
+    private var favPrefs: SharedPreferences? = null
+
+    fun initFavorites(context: Context) {
+        if (favPrefs == null) {
+            favPrefs = context.getSharedPreferences("fav_channels", Context.MODE_PRIVATE)
+        }
+    }
+
+    fun toggleFavorite(url: String) {
+        val prefs = favPrefs ?: return
+        val set = prefs.getStringSet("favorites", setOf()) ?: setOf()
+        val newSet = if (url in set) set - url else set + url
+        prefs.edit().putStringSet("favorites", newSet).apply()
+    }
+
+    fun isFavorite(url: String): Boolean {
+        val prefs = favPrefs ?: return false
+        return (prefs.getStringSet("favorites", setOf()) ?: setOf()).contains(url)
+    }
+
+    fun getFavoriteUrls(): Set<String> {
+        val prefs = favPrefs ?: return emptySet()
+        return prefs.getStringSet("favorites", setOf()) ?: emptySet()
+    }
 
     /** 从 iptv-org JSON API 获取体育频道（channels.json + streams.json 关联） */
     fun fetchSportsChannels(): List<StreamChannel> {

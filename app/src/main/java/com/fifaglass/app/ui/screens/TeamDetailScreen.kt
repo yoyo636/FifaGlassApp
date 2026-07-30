@@ -1,6 +1,7 @@
 package com.fifaglass.app.ui.screens
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -177,8 +178,17 @@ fun TeamDetailScreen(team: Team, all: List<Team>, onMatchClick: (MatchInfo) -> U
         }
         Spacer(Modifier.height(12.dp))
 
-        // 近期比赛
+        // 近期战绩 (Form Guide)
         val matches = teamMatches
+        if (!matches.isNullOrEmpty()) {
+            val finished = matches.filter { it.homeScore != null && it.awayScore != null }.takeLast(5)
+            if (finished.isNotEmpty()) {
+                FormGuideCard(team, finished)
+                Spacer(Modifier.height(12.dp))
+            }
+        }
+
+        // 近期比赛
         if (!matches.isNullOrEmpty()) {
             GlassCard(Modifier.fillMaxWidth()) {
                 Text(
@@ -196,6 +206,51 @@ fun TeamDetailScreen(team: Team, all: List<Team>, onMatchClick: (MatchInfo) -> U
             }
         }
         Spacer(Modifier.height(100.dp))
+    }
+}
+
+@Composable
+private fun FormGuideCard(team: Team, matches: List<MatchInfo>) {
+    val results = matches.map { m ->
+        val isHome = m.homeCode == team.code
+        val gf = if (isHome) (m.homeScore ?: 0) else (m.awayScore ?: 0)
+        val ga = if (isHome) (m.awayScore ?: 0) else (m.homeScore ?: 0)
+        when {
+            gf > ga -> "W"
+            gf < ga -> "L"
+            else -> "D"
+        }
+    }
+    val wins = results.count { it == "W" }
+    val draws = results.count { it == "D" }
+    val losses = results.count { it == "L" }
+    val total = results.size
+    val winRate = if (total > 0) (wins.toDouble() / total * 100).toInt() else 0
+
+    GlassCard(Modifier.fillMaxWidth()) {
+        Text("近期战绩", color = GlassColors.textPrimary, fontSize = 17.sp, fontWeight = FontWeight.Bold)
+        Spacer(Modifier.height(8.dp))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            results.forEach { r ->
+                val color = when (r) {
+                    "W" -> GlassColors.up
+                    "L" -> GlassColors.down
+                    else -> GlassColors.textSecondary
+                }
+                Box(
+                    Modifier.size(32.dp).clip(RoundedCornerShape(8.dp)).background(color.copy(alpha = 0.2f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(r, color = color, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                }
+                Spacer(Modifier.width(8.dp))
+            }
+        }
+        Spacer(Modifier.height(8.dp))
+        Row(Modifier.fillMaxWidth()) {
+            Text("${wins}胜 ${draws}平 ${losses}负", color = GlassColors.textSecondary, fontSize = 13.sp, modifier = Modifier.weight(1f))
+            Text("胜率 ${winRate}%", color = if (winRate >= 60) GlassColors.up else GlassColors.accentGold, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+        }
     }
 }
 

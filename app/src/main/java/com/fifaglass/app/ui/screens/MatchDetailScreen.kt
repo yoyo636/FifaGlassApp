@@ -1,5 +1,7 @@
 package com.fifaglass.app.ui.screens
 
+import android.content.Intent
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -30,6 +32,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -51,6 +54,7 @@ import kotlinx.coroutines.withContext
 /** 比赛详情：比分、事件时间轴（进球/红黄牌/换人/关键节点）、技术统计、阵容、内嵌预测 */
 @Composable
 fun MatchDetailScreen(m: MatchInfo, rankings: List<Team>?, onOpenCompanion: () -> Unit = {}, onOpenStream: () -> Unit = {}) {
+    val context = LocalContext.current
     var detail by remember { mutableStateOf<MatchDetail?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
     var livePrediction by remember { mutableStateOf<com.fifaglass.app.rating.Prediction?>(null) }
@@ -224,6 +228,47 @@ fun MatchDetailScreen(m: MatchInfo, rankings: List<Team>?, onOpenCompanion: () -
             contentAlignment = Alignment.Center
         ) {
             Text("📹 观看直播 / 录播", color = GlassColors.up, fontSize = 15.sp, fontWeight = FontWeight.Bold)
+        }
+        Spacer(Modifier.height(8.dp))
+
+        Box(
+            Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp))
+                .background(GlassColors.accentViolet.copy(alpha = 0.15f))
+                .clickable {
+                    val shareText = buildString {
+                        appendLine("⚽ FifaGlass 比赛卡片")
+                        appendLine("────────────────")
+                        appendLine("${m.competition}")
+                        appendLine("${m.homeName} ${m.homeScore ?: "-"} : ${m.awayScore ?: "-"} ${m.awayName}")
+                        appendLine("日期: ${m.date}")
+                        appendLine()
+                        val lp = livePrediction
+                        val pp = prePrediction
+                        if (lp != null) {
+                            appendLine("实时预测:")
+                            appendLine("${m.homeName} ${(lp.pHome * 100).toInt()}% | 平 ${(lp.pDraw * 100).toInt()}% | ${m.awayName} ${(lp.pAway * 100).toInt()}%")
+                        } else if (pp != null) {
+                            appendLine("赛前预测:")
+                            appendLine("${m.homeName} ${(pp.pHome * 100).toInt()}% | 平 ${(pp.pDraw * 100).toInt()}% | ${m.awayName} ${(pp.pAway * 100).toInt()}%")
+                            appendLine("预测比分: ${pp.likelyScore}")
+                            appendLine("信心指数: ${pp.confidence}")
+                        }
+                        appendLine()
+                        appendLine("⭐ FifaGlass - 智能足球预测应用")
+                    }
+                    val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                        type = "text/plain"
+                        putExtra(Intent.EXTRA_TEXT, shareText)
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    }
+                    context.startActivity(Intent.createChooser(shareIntent, "分享比赛卡片").apply {
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    })
+                }
+                .padding(vertical = 12.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Text("📤 分享比赛卡片", color = GlassColors.accentViolet, fontSize = 15.sp, fontWeight = FontWeight.Bold)
         }
         Spacer(Modifier.height(12.dp))
 
