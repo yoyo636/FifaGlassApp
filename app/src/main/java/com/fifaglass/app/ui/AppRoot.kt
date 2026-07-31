@@ -48,10 +48,12 @@ import com.fifaglass.app.data.ForumRepository
 import com.fifaglass.app.data.MatchInfo
 import com.fifaglass.app.data.Team
 import com.fifaglass.app.data.UserRepository
+import com.fifaglass.app.ui.screens.AIAnalystScreen
 import com.fifaglass.app.ui.screens.CompareScreen
 import com.fifaglass.app.ui.screens.CompetitionMatchesScreen
 import com.fifaglass.app.ui.screens.CompetitionsScreen
 import com.fifaglass.app.ui.screens.CreatePostScreen
+import com.fifaglass.app.ui.screens.FormationScreen
 import com.fifaglass.app.ui.screens.ForumScreen
 import com.fifaglass.app.ui.screens.FullPool
 import com.fifaglass.app.ui.screens.HomeScreen
@@ -68,6 +70,7 @@ import com.fifaglass.app.ui.screens.SettingsStore
 import com.fifaglass.app.ui.screens.StatsScreen
 import com.fifaglass.app.ui.screens.TeamDetailScreen
 import com.fifaglass.app.ui.screens.UserCenterScreen
+import com.fifaglass.app.ui.screens.WatchPartyScreen
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -91,6 +94,9 @@ sealed interface Screen {
     data class Stream(val match: MatchInfo?) : Screen
     data class CompetitionMatches(val competition: Competition) : Screen
     data class PostDetail(val post: ForumPost) : Screen
+    data class AIAnalyst(val home: Team, val away: Team, val match: MatchInfo?) : Screen
+    data class Formation(val home: Team, val away: Team, val homeTactics: String?, val awayTactics: String?) : Screen
+    data class WatchParty(val matchId: String?, val matchTitle: String?) : Screen
 }
 
 private data class TabInfo(val label: String, val icon: String, val screen: Screen)
@@ -120,6 +126,7 @@ fun AppRoot() {
         com.fifaglass.app.data.StreamRepository.initFavorites(context)
         UserRepository.init(context)
         ForumRepository.init(context)
+        com.fifaglass.app.data.WatchPartyRepository.init(context)
     }
 
     var gender by remember { mutableStateOf(1) }
@@ -210,12 +217,29 @@ fun AppRoot() {
                             all = current ?: listOf(s.team),
                             onMatchClick = { navigate(Screen.MatchDetail(it)) }
                         )
-                        is Screen.MatchDetail -> MatchDetailScreen(
-                            m = s.match,
-                            rankings = current,
-                            onOpenCompanion = { navigate(Screen.Companion(s.match)) },
-                            onOpenStream = { navigate(Screen.Stream(s.match)) }
-                        )
+                        is Screen.MatchDetail -> {
+                            val homeTeam = current?.find { it.code == s.match.homeCode } ?: current?.firstOrNull()
+                            val awayTeam = current?.find { it.code == s.match.awayCode } ?: current?.lastOrNull()
+                            MatchDetailScreen(
+                                m = s.match,
+                                rankings = current,
+                                onOpenCompanion = { navigate(Screen.Companion(s.match)) },
+                                onOpenStream = { navigate(Screen.Stream(s.match)) },
+                                onOpenAIAnalyst = {
+                                    if (homeTeam != null && awayTeam != null) {
+                                        navigate(Screen.AIAnalyst(homeTeam, awayTeam, s.match))
+                                    }
+                                },
+                                onOpenFormation = {
+                                    if (homeTeam != null && awayTeam != null) {
+                                        navigate(Screen.Formation(homeTeam, awayTeam, s.match.homeTactics, s.match.awayTactics))
+                                    }
+                                },
+                                onOpenWatchParty = {
+                                    navigate(Screen.WatchParty(s.match.id, "${s.match.homeName} vs ${s.match.awayName}"))
+                                },
+                            )
+                        }
                         is Screen.Companion -> LiveMatchCompanion(
                             m = s.match,
                             rankings = current,
@@ -251,6 +275,24 @@ fun AppRoot() {
                         )
                         is Screen.MyPosts -> MyPostsScreen(
                             onPostClick = { navigate(Screen.PostDetail(it)) },
+                            onBack = { back() }
+                        )
+                        is Screen.AIAnalyst -> AIAnalystScreen(
+                            home = s.home,
+                            away = s.away,
+                            match = s.match,
+                            onBack = { back() }
+                        )
+                        is Screen.Formation -> FormationScreen(
+                            home = s.home,
+                            away = s.away,
+                            homeTactics = s.homeTactics,
+                            awayTactics = s.awayTactics,
+                            onBack = { back() }
+                        )
+                        is Screen.WatchParty -> WatchPartyScreen(
+                            matchId = s.matchId,
+                            matchTitle = s.matchTitle,
                             onBack = { back() }
                         )
                     }

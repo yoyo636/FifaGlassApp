@@ -62,7 +62,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 @Composable
-fun MatchDetailScreen(m: MatchInfo, rankings: List<Team>?, onOpenCompanion: () -> Unit = {}, onOpenStream: () -> Unit = {}) {
+fun MatchDetailScreen(m: MatchInfo, rankings: List<Team>?, onOpenCompanion: () -> Unit = {}, onOpenStream: () -> Unit = {}, onOpenAIAnalyst: () -> Unit = {}, onOpenFormation: () -> Unit = {}, onOpenWatchParty: () -> Unit = {}) {
     val context = LocalContext.current
     var detail by remember { mutableStateOf<MatchDetail?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
@@ -129,6 +129,12 @@ fun MatchDetailScreen(m: MatchInfo, rankings: List<Team>?, onOpenCompanion: () -
         AuroraActionButton("📺 看球伴侣 · 实时辅助工具", GlassColors.accentMint) { onOpenCompanion() }
         Spacer(Modifier.height(8.dp))
         AuroraActionButton("📹 观看直播 / 录播", GlassColors.up) { onOpenStream() }
+        Spacer(Modifier.height(8.dp))
+        AuroraActionButton("🤖 AI 比赛分析师", GlassColors.accentBlue) { onOpenAIAnalyst() }
+        Spacer(Modifier.height(8.dp))
+        AuroraActionButton("⚽ 战术阵型可视化", GlassColors.accentViolet) { onOpenFormation() }
+        Spacer(Modifier.height(8.dp))
+        AuroraActionButton("🎉 观赛派对 · 社交观赛", GlassColors.accentGold) { onOpenWatchParty() }
         Spacer(Modifier.height(8.dp))
 
         AuroraActionButton("📤 分享比赛卡片", GlassColors.accentViolet) {
