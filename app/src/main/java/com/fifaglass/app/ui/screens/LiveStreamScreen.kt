@@ -2,9 +2,6 @@ package com.fifaglass.app.ui.screens
 
 import android.content.Intent
 import android.net.Uri
-import android.webkit.WebChromeClient
-import android.webkit.WebView
-import android.webkit.WebViewClient
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -18,7 +15,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -35,7 +31,6 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -56,7 +51,6 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.viewinterop.AndroidView
 import coil.compose.AsyncImage
 import com.fifaglass.app.data.MatchInfo
 import com.fifaglass.app.data.StreamChannel
@@ -69,10 +63,23 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-private fun isHlsUrl(url: String): Boolean {
-    val lower = url.lowercase()
-    return lower.contains(".m3u8") || lower.contains(".m3u?") || lower.contains(".m3u8?")
-}
+data class LivePlatform(
+    val name: String,
+    val url: String,
+    val icon: String,
+    val desc: String,
+    val color: Color,
+)
+
+private val domesticPlatforms = listOf(
+    LivePlatform("CCTV-5 央视频", "https://tv.cctv.com/live/cctv5/m/", "📺", "央视体育频道 24小时直播", Color(0xFFFF375F)),
+    LivePlatform("哔哩哔哩体育", "https://www.bilibili.com/v/game/sport/", "🎬", "B站体育赛事直播区", Color(0xFF00A1D6)),
+    LivePlatform("优酷体育", "https://sports.youku.com/", "🎥", "优酷体育赛事频道", Color(0xFF1989FA)),
+    LivePlatform("腾讯体育", "https://sports.qq.com/", "🏀", "腾讯体育赛事直播", Color(0xFF00C896)),
+    LivePlatform("咪咕视频", "https://www.miguvideo.com/", "📱", "咪咕视频体育直播", Color(0xFFE9382A)),
+    LivePlatform("抖音体育", "https://www.douyin.com/channel/sport", "🎵", "抖音体育赛事直播", Color(0xFF000000)),
+    LivePlatform("快手体育", "https://www.kuaishou.com/profile/3x9x9x9x", "⚡", "快手体育赛事", Color(0xFFFF6600)),
+)
 
 @Composable
 fun LiveStreamScreen(match: MatchInfo?) {
@@ -80,7 +87,6 @@ fun LiveStreamScreen(match: MatchInfo?) {
     val scope = rememberCoroutineScope()
     var allChannels by remember { mutableStateOf<List<StreamChannel>>(StreamRepository.quickChannels()) }
     var filteredChannels by remember { mutableStateOf<List<StreamChannel>>(allChannels) }
-    var selectedChannel by remember { mutableStateOf<StreamChannel?>(null) }
     var loading by remember { mutableStateOf(true) }
     var refreshing by remember { mutableStateOf(false) }
     var query by remember { mutableStateOf("") }
@@ -110,8 +116,6 @@ fun LiveStreamScreen(match: MatchInfo?) {
         }
     }
 
-    val current = selectedChannel
-
     Column(Modifier.fillMaxSize().padding(horizontal = 20.dp)) {
         Spacer(Modifier.height(8.dp))
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -124,7 +128,7 @@ fun LiveStreamScreen(match: MatchInfo?) {
                 )
                 Text(
                     if (match != null) "${match.homeName} vs ${match.awayName}"
-                    else "实时体育频道 · 快速加载",
+                    else "选择平台 · 一键跳转观看",
                     color = GlassColors.textSecondary,
                     fontSize = 13.sp
                 )
@@ -154,17 +158,22 @@ fun LiveStreamScreen(match: MatchInfo?) {
         }
         Spacer(Modifier.height(12.dp))
 
-        if (current != null && isHlsUrl(current.url)) {
-            WebViewPlayerCard(current)
-            Spacer(Modifier.height(12.dp))
-        } else if (current != null && !isHlsUrl(current.url)) {
-            LaunchedEffect(current.url) {
-                runCatching {
-                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(current.url))
-                    intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK
-                    context.startActivity(intent)
-                }
+        PlatformCardList(domesticPlatforms) { platform ->
+            runCatching {
+                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(platform.url))
+                intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                context.startActivity(intent)
             }
+        }
+        Spacer(Modifier.height(12.dp))
+
+        if (match != null) {
+            GlassCard(Modifier.fillMaxWidth()) {
+                Text("国际直播源", color = GlassColors.textPrimary, fontSize = 15.sp, fontWeight = FontWeight.Bold)
+                Spacer(Modifier.height(4.dp))
+                Text("以下为国际体育频道，点击可在外部浏览器中打开", color = GlassColors.textSecondary, fontSize = 12.sp)
+            }
+            Spacer(Modifier.height(8.dp))
         }
 
         TextField(
@@ -212,7 +221,13 @@ fun LiveStreamScreen(match: MatchInfo?) {
             val favUrls = remember(favTick) { StreamRepository.getFavoriteUrls() }
             val favChannels = allChannels.filter { it.url in favUrls }
             if (favChannels.isNotEmpty() && query.isBlank()) {
-                AuroraFavCard(favChannels, selectedChannel?.url) { selectedChannel = it }
+                AuroraFavCard(favChannels) { ch ->
+                    runCatching {
+                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(ch.url))
+                        intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                        context.startActivity(intent)
+                    }
+                }
                 Spacer(Modifier.height(10.dp))
             }
 
@@ -224,8 +239,12 @@ fun LiveStreamScreen(match: MatchInfo?) {
             } else {
                 LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     items(list, key = { it.id + "_" + it.url }) { ch ->
-                        AuroraChannelRow(ch, selectedChannel?.url == ch.url) {
-                            selectedChannel = ch
+                        AuroraChannelRow(ch) {
+                            runCatching {
+                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(ch.url))
+                                intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                                context.startActivity(intent)
+                            }
                         }
                     }
                 }
@@ -257,7 +276,67 @@ private fun AuroraRefreshButton(onClick: () -> Unit) {
 }
 
 @Composable
-private fun AuroraFavCard(channels: List<StreamChannel>, selectedUrl: String?, onSelect: (StreamChannel) -> Unit) {
+private fun PlatformCardList(platforms: List<LivePlatform>, onClick: (LivePlatform) -> Unit) {
+    GlassCard(Modifier.fillMaxWidth()) {
+        Text("国内直播平台", color = GlassColors.textPrimary, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+        Spacer(Modifier.height(4.dp))
+        Text("点击直接跳转到对应平台观看直播", color = GlassColors.textSecondary, fontSize = 12.sp)
+        Spacer(Modifier.height(12.dp))
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            platforms.forEach { p ->
+                PlatformRow(p) { onClick(p) }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PlatformRow(platform: LivePlatform, onClick: () -> Unit) {
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(14.dp))
+            .background(
+                Brush.horizontalGradient(
+                    listOf(platform.color.copy(alpha = 0.08f), platform.color.copy(alpha = 0.03f))
+                )
+            )
+            .clickable { onClick() }
+            .padding(horizontal = 12.dp, vertical = 10.dp)
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                Modifier.size(40.dp).clip(CircleShape)
+                    .background(platform.color.copy(alpha = 0.15f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(platform.icon, fontSize = 20.sp)
+            }
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f)) {
+                Text(
+                    platform.name,
+                    color = GlassColors.textPrimary,
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    platform.desc,
+                    color = GlassColors.textSecondary,
+                    fontSize = 11.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+            Text("→", color = platform.color, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+        }
+    }
+}
+
+@Composable
+private fun AuroraFavCard(channels: List<StreamChannel>, onSelect: (StreamChannel) -> Unit) {
     Box(
         Modifier
             .fillMaxWidth()
@@ -283,7 +362,7 @@ private fun AuroraFavCard(channels: List<StreamChannel>, selectedUrl: String?, o
             Spacer(Modifier.height(8.dp))
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 channels.take(5).forEach { ch ->
-                    AuroraChannelRow(ch, selectedUrl == ch.url) { onSelect(ch) }
+                    AuroraChannelRow(ch) { onSelect(ch) }
                 }
             }
         }
@@ -291,152 +370,15 @@ private fun AuroraFavCard(channels: List<StreamChannel>, selectedUrl: String?, o
 }
 
 @Composable
-private fun WebViewPlayerCard(channel: StreamChannel) {
-    val context = LocalContext.current
-
-    val html = remember(channel.url) {
-        """
-        <html>
-        <head>
-        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-        <style>
-            body { margin:0; padding:0; background:#000; overflow:hidden; }
-            video { width:100%; height:100%; object-fit:contain; background:#000; }
-        </style>
-        </head>
-        <body>
-        <video autoplay controls playsinline webkit-playsinline>
-        <source src="${channel.url}" type="application/x-mpegURL">
-        Your browser does not support the video tag.
-        </video>
-        <script>
-        var v = document.querySelector('video');
-        v.addEventListener('error', function() {
-            document.body.innerHTML = '<div style="color:#fff;text-align:center;padding:20px;font-family:sans-serif;">播放失败，请尝试外部播放器</div>';
-        }, true);
-        v.play().catch(function(){});
-        </script>
-        </body>
-        </html>
-        """.trimIndent()
-    }
-
-    DisposableEffect(Unit) {
-        onDispose {
-        }
-    }
-
-    Box(
-        Modifier
-            .fillMaxWidth()
-            .shadow(20.dp, RoundedCornerShape(20.dp), ambientColor = Color.Black.copy(alpha = 0.3f))
-            .clip(RoundedCornerShape(20.dp))
-            .background(Color.Black)
-    ) {
-        Column {
-            Row(
-                Modifier
-                    .fillMaxWidth()
-                    .background(
-                        Brush.horizontalGradient(
-                            listOf(Color(0xFF1A1A2E), Color(0xFF0F0F18))
-                        )
-                    )
-                    .padding(horizontal = 14.dp, vertical = 10.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                val transition = rememberInfiniteTransition(label = "live-pulse")
-                val pulseAlpha by transition.animateFloat(
-                    initialValue = 0.4f, targetValue = 1f,
-                    animationSpec = infiniteRepeatable(
-                        animation = tween(1100, easing = LinearEasing),
-                        repeatMode = RepeatMode.Reverse
-                    ), label = "pulse-alpha"
-                )
-                Box(
-                    Modifier
-                        .size(8.dp)
-                        .clip(CircleShape)
-                        .background(Color(0xFFFF375F).copy(alpha = pulseAlpha))
-                )
-                Spacer(Modifier.width(8.dp))
-                Text("LIVE", color = Color(0xFFFF375F), fontSize = 12.sp, fontWeight = FontWeight.Black)
-                Spacer(Modifier.weight(1f))
-                Text(channel.quality.ifEmpty { "Live" }, color = GlassColors.accentGold, fontSize = 12.sp)
-            }
-            Box(
-                Modifier
-                    .fillMaxWidth()
-                    .aspectRatio(16f / 9f)
-                    .background(Color.Black)
-            ) {
-                AndroidView(
-                    factory = { ctx ->
-                        WebView(ctx).apply {
-                            settings.javaScriptEnabled = true
-                            settings.mediaPlaybackRequiresUserGesture = false
-                            settings.allowFileAccess = false
-                            settings.loadWithOverviewMode = true
-                            settings.useWideViewPort = true
-                            webChromeClient = WebChromeClient()
-                            webViewClient = WebViewClient()
-                            loadDataWithBaseURL(null, html, "text/html", "UTF-8", null)
-                        }
-                    },
-                    update = { view ->
-                    },
-                    modifier = Modifier.fillMaxSize()
-                )
-            }
-            Column(Modifier.padding(14.dp)) {
-                Text(channel.name, color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Bold)
-                if (channel.country.isNotEmpty()) {
-                    Text("${channel.country} · ${channel.category}", color = Color.White.copy(alpha = 0.7f), fontSize = 11.sp)
-                }
-                Spacer(Modifier.height(8.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Box(
-                        Modifier.clip(RoundedCornerShape(8.dp))
-                            .background(GlassColors.accentMint.copy(alpha = 0.25f))
-                            .clickable {
-                                runCatching {
-                                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(channel.url))
-                                    intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK
-                                    context.startActivity(intent)
-                                }
-                            }
-                            .padding(horizontal = 12.dp, vertical = 6.dp)
-                    ) {
-                        Text("外部播放器", color = GlassColors.accentMint, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                    }
-                    if (channel.referrer.isNotEmpty()) {
-                        Text("需 Referer", color = GlassColors.accentGold, fontSize = 10.sp)
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun AuroraChannelRow(channel: StreamChannel, isSelected: Boolean, onClick: () -> Unit) {
+private fun AuroraChannelRow(channel: StreamChannel, onClick: () -> Unit) {
     var isFav by remember(channel.url) { mutableStateOf(StreamRepository.isFavorite(channel.url)) }
-    val cardMod = if (isSelected) {
-        Modifier
-            .fillMaxWidth()
-            .shadow(10.dp, RoundedCornerShape(16.dp), ambientColor = GlassColors.accentMint.copy(alpha = 0.3f))
-    } else {
+    Box(
         Modifier
             .fillMaxWidth()
             .shadow(4.dp, RoundedCornerShape(16.dp), ambientColor = Color.Black.copy(alpha = 0.05f))
-    }
-    Box(
-        cardMod
             .clip(RoundedCornerShape(16.dp))
             .background(
-                if (isSelected) Aurora.success()
-                else Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.95f), Color.White.copy(alpha = 0.82f))),
-                alpha = if (isSelected) 0.15f else 1f
+                Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.95f), Color.White.copy(alpha = 0.82f)))
             )
             .clickable { onClick() }
             .padding(horizontal = 12.dp, vertical = 10.dp)
@@ -461,9 +403,9 @@ private fun AuroraChannelRow(channel: StreamChannel, isSelected: Boolean, onClic
             Column(Modifier.weight(1f)) {
                 Text(
                     channel.name,
-                    color = if (isSelected) GlassColors.accentMint else GlassColors.textPrimary,
+                    color = GlassColors.textPrimary,
                     fontSize = 14.sp,
-                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                    fontWeight = FontWeight.Medium,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -488,22 +430,12 @@ private fun AuroraChannelRow(channel: StreamChannel, isSelected: Boolean, onClic
                 )
             }
             Spacer(Modifier.width(6.dp))
-            if (isSelected) {
-                Box(
-                    Modifier.clip(RoundedCornerShape(8.dp))
-                        .background(GlassColors.accentMint.copy(alpha = 0.2f))
-                        .padding(horizontal = 8.dp, vertical = 3.dp)
-                ) {
-                    Text("播放中", color = GlassColors.accentMint, fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                }
-            } else {
-                Box(
-                    Modifier.clip(RoundedCornerShape(8.dp))
-                        .background(GlassColors.accentGold.copy(alpha = 0.15f))
-                        .padding(horizontal = 8.dp, vertical = 3.dp)
-                ) {
-                    Text("播放", color = GlassColors.accentGold, fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                }
+            Box(
+                Modifier.clip(RoundedCornerShape(8.dp))
+                    .background(GlassColors.accentGold.copy(alpha = 0.15f))
+                    .padding(horizontal = 8.dp, vertical = 3.dp)
+            ) {
+                Text("打开", color = GlassColors.accentGold, fontSize = 10.sp, fontWeight = FontWeight.Bold)
             }
         }
     }
