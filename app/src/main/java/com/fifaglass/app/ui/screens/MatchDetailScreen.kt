@@ -59,6 +59,7 @@ import com.fifaglass.app.ui.Aurora
 import com.fifaglass.app.ui.GlassCard
 import com.fifaglass.app.ui.GlassColors
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.withContext
 
 @Composable
@@ -66,22 +67,41 @@ fun MatchDetailScreen(m: MatchInfo, rankings: List<Team>?, onOpenCompanion: () -
     val context = LocalContext.current
     var detail by remember { mutableStateOf<MatchDetail?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
+    var liveMatch by remember { mutableStateOf(m) }
     var livePrediction by remember { mutableStateOf<com.fifaglass.app.rating.Prediction?>(null) }
     var prePrediction by remember { mutableStateOf<com.fifaglass.app.rating.PredictionOutput?>(null) }
     var refreshTick by remember { mutableStateOf(0) }
+    var retryTick by remember { mutableStateOf(0) }
 
-    LaunchedEffect(m.id) {
-        try {
-            detail = withContext(Dispatchers.IO) { FifaApi.fetchMatchDetail(m) }
-        } catch (e: Exception) {
-            error = e.message ?: "详情加载失败"
+    LaunchedEffect(m.id, retryTick) {
+        while (isActive) {
+            try {
+                detail = withContext(Dispatchers.IO) { FifaApi.fetchMatchDetail(m) }
+                error = null
+            } catch (e: Exception) {
+                error = e.message ?: "详情加载失败"
+            }
+            kotlinx.coroutines.delay(15_000L)
         }
     }
 
-    LaunchedEffect(m.id, m.isScheduled, rankings) {
-        if (!m.isScheduled) { prePrediction = null; return@LaunchedEffect }
-        val home = rankings?.firstOrNull { it.code == m.homeCode }
-        val away = rankings?.firstOrNull { it.code == m.awayCode }
+    LaunchedEffect(m.id) {
+        while (isActive) {
+            try {
+                val live = withContext(Dispatchers.IO) {
+                    FifaApi.fetchLiveMatches(1) + FifaApi.fetchLiveMatches(2)
+                }
+                val updated = live.find { it.id == m.id }
+                if (updated != null) liveMatch = updated
+            } catch (_: Exception) {}
+            kotlinx.coroutines.delay(15_000L)
+        }
+    }
+
+    LaunchedEffect(m.id, liveMatch.isScheduled, rankings) {
+        if (!liveMatch.isScheduled) { prePrediction = null; return@LaunchedEffect }
+        val home = rankings?.firstOrNull { it.code == liveMatch.homeCode }
+        val away = rankings?.firstOrNull { it.code == liveMatch.awayCode }
         if (home != null && away != null) {
             prePrediction = runCatching {
                 withContext(Dispatchers.IO) {
@@ -91,26 +111,28 @@ fun MatchDetailScreen(m: MatchInfo, rankings: List<Team>?, onOpenCompanion: () -
         }
     }
 
-    LaunchedEffect(m.id, m.isLive, m.matchTime, m.homeScore, m.awayScore, refreshTick, rankings) {
-        if (!m.isLive) { livePrediction = null; return@LaunchedEffect }
-        val home = rankings?.firstOrNull { it.code == m.homeCode }
-        val away = rankings?.firstOrNull { it.code == m.awayCode }
-        if (home != null && away != null && m.homeScore != null && m.awayScore != null) {
-            val min = m.matchTime.filter { it.isDigit() || it == '+' }
+    LaunchedEffect(m.id, liveMatch.isLive, liveMatch.matchTime, liveMatch.homeScore, liveMatch.awayScore, refreshTick, rankings) {
+        if (!liveMatch.isLive) { livePrediction = null; return@LaunchedEffect }
+        val home = rankings?.firstOrNull { it.code == liveMatch.homeCode }
+        val away = rankings?.firstOrNull { it.code == liveMatch.awayCode }
+        val homeScore = liveMatch.homeScore
+        val awayScore = liveMatch.awayScore
+        if (home != null && away != null && homeScore != null && awayScore != null) {
+            val min = liveMatch.matchTime.filter { it.isDigit() || it == '+' }
                 .split('+').filter { it.isNotEmpty() }
                 .sumOf { it.toIntOrNull() ?: 0 }
             livePrediction = withContext(Dispatchers.IO) {
                 com.fifaglass.app.rating.PredictionEngine.predictLive(
-                    home, away, m.homeScore, m.awayScore, min
+                    home, away, homeScore, awayScore, min
                 )
             }
         }
     }
 
-    LaunchedEffect(m.id, m.isLive) {
-        if (!m.isLive) return@LaunchedEffect
+    LaunchedEffect(m.id, liveMatch.isLive) {
+        if (!liveMatch.isLive) return@LaunchedEffect
         while (true) {
-            kotlinx.coroutines.delay(60_000)
+            kotlinx.coroutines.delay(15_000)
             refreshTick++
         }
     }
@@ -123,7 +145,7 @@ fun MatchDetailScreen(m: MatchInfo, rankings: List<Team>?, onOpenCompanion: () -
     ) {
         Spacer(Modifier.height(8.dp))
 
-        ScoreHeaderCard(m)
+        ScoreHeaderCard(liveMatch)
         Spacer(Modifier.height(12.dp))
 
         AuroraActionButton("📺 看球伴侣 · 实时辅助工具", GlassColors.accentMint) { onOpenCompanion() }
@@ -141,18 +163,18 @@ fun MatchDetailScreen(m: MatchInfo, rankings: List<Team>?, onOpenCompanion: () -
             val shareText = buildString {
                 appendLine("⚽ FifaGlass 比赛卡片")
                 appendLine("────────────────")
-                appendLine("${m.competition}")
-                appendLine("${m.homeName} ${m.homeScore ?: "-"} : ${m.awayScore ?: "-"} ${m.awayName}")
-                appendLine("日期: ${m.date}")
+                appendLine("${liveMatch.competition}")
+                appendLine("${liveMatch.homeName} ${liveMatch.homeScore ?: "-"} : ${liveMatch.awayScore ?: "-"} ${liveMatch.awayName}")
+                appendLine("日期: ${liveMatch.date}")
                 appendLine()
                 val lp = livePrediction
                 val pp = prePrediction
                 if (lp != null) {
                     appendLine("实时预测:")
-                    appendLine("${m.homeName} ${(lp.pHome * 100).toInt()}% | 平 ${(lp.pDraw * 100).toInt()}% | ${m.awayName} ${(lp.pAway * 100).toInt()}%")
+                    appendLine("${liveMatch.homeName} ${(lp.pHome * 100).toInt()}% | 平 ${(lp.pDraw * 100).toInt()}% | ${liveMatch.awayName} ${(lp.pAway * 100).toInt()}%")
                 } else if (pp != null) {
                     appendLine("赛前预测:")
-                    appendLine("${m.homeName} ${(pp.pHome * 100).toInt()}% | 平 ${(pp.pDraw * 100).toInt()}% | ${m.awayName} ${(pp.pAway * 100).toInt()}%")
+                    appendLine("${liveMatch.homeName} ${(pp.pHome * 100).toInt()}% | 平 ${(pp.pDraw * 100).toInt()}% | ${liveMatch.awayName} ${(pp.pAway * 100).toInt()}%")
                     appendLine("预测比分: ${pp.likelyScore}")
                     appendLine("信心指数: ${pp.confidence}")
                 }
@@ -171,8 +193,8 @@ fun MatchDetailScreen(m: MatchInfo, rankings: List<Team>?, onOpenCompanion: () -
         Spacer(Modifier.height(12.dp))
 
         val pp = prePrediction
-        if (m.isScheduled && pp != null) {
-            PredictionCard("赛前预测（独立预测系统）", pp.pHome, pp.pDraw, pp.pAway, m.homeCode, m.awayCode, pp.likelyScore, pp.confidence, pp.xgHome, pp.xgAway, pp.overProbabilities.over25, pp.bttsProbability, pp.upsetProbability)
+        if (liveMatch.isScheduled && pp != null) {
+            PredictionCard("赛前预测（独立预测系统）", pp.pHome, pp.pDraw, pp.pAway, liveMatch.homeCode, liveMatch.awayCode, pp.likelyScore, pp.confidence, pp.xgHome, pp.xgAway, pp.overProbabilities.over25, pp.bttsProbability, pp.upsetProbability)
             Spacer(Modifier.height(12.dp))
         }
 
@@ -182,6 +204,15 @@ fun MatchDetailScreen(m: MatchInfo, rankings: List<Team>?, onOpenCompanion: () -
                 Text("事件数据不可用", color = GlassColors.accentGold, fontWeight = FontWeight.Bold)
                 Spacer(Modifier.height(4.dp))
                 Text(err, color = GlassColors.textSecondary, fontSize = 12.sp)
+                Spacer(Modifier.height(8.dp))
+                Box(
+                    Modifier.clip(RoundedCornerShape(10.dp))
+                        .background(GlassColors.accentMint.copy(alpha = 0.2f))
+                        .clickable { retryTick++ }
+                        .padding(horizontal = 14.dp, vertical = 8.dp)
+                ) {
+                    Text("重试", color = GlassColors.accentMint, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                }
             }
             detail == null -> GlassCard(Modifier.fillMaxWidth()) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -194,15 +225,15 @@ fun MatchDetailScreen(m: MatchInfo, rankings: List<Team>?, onOpenCompanion: () -
                 val d = detail!!
                 val lp = livePrediction
                 if (lp != null) {
-                    LivePredictionCard(lp, m.homeCode, m.awayCode)
+                    LivePredictionCard(lp, liveMatch.homeCode, liveMatch.awayCode)
                     Spacer(Modifier.height(12.dp))
                 }
-                TimelineCard(d, m)
+                TimelineCard(d, liveMatch)
                 Spacer(Modifier.height(12.dp))
-                TechInfoCard(d, m, rankings)
+                TechInfoCard(d, liveMatch, rankings)
                 Spacer(Modifier.height(12.dp))
                 if (d.homePlayers.isNotEmpty() || d.awayPlayers.isNotEmpty()) {
-                    LineupCard(m, d)
+                    LineupCard(liveMatch, d)
                 }
             }
         }

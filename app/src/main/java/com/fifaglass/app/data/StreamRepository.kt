@@ -2,6 +2,8 @@ package com.fifaglass.app.data
 
 import android.content.Context
 import android.content.SharedPreferences
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import org.json.JSONArray
 import org.json.JSONObject
 import java.net.HttpURLConnection
@@ -72,13 +74,13 @@ object StreamRepository {
         return prefs.getStringSet("favorites", setOf()) ?: emptySet()
     }
 
-    val presetChannels: List<StreamChannel> = listOf(
-        StreamChannel("fifa-plus", "FIFA+ 官方", "https://www.fifa.com/fifaplus/en/tournaments", "", "INT", "football", "1080p", "", UA),
-        StreamChannel("cctv5", "CCTV-5 体育频道", IPTV_SPORTS_M3U, "", "CN", "sports", "1080p", "", UA),
-        StreamChannel("espn", "ESPN 体育", IPTV_SPORTS_M3U, "", "US", "sports", "1080p", "", UA),
-        StreamChannel("skysports", "Sky Sports", IPTV_SPORTS_M3U, "", "GB", "sports", "1080p", "", UA),
-        StreamChannel("beinsports", "beIN Sports", IPTV_SPORTS_M3U, "", "FR", "sports", "1080p", "", UA),
-        StreamChannel("eurosport", "Eurosport", IPTV_SPORTS_M3U, "", "EU", "sports", "1080p", "", UA),
+    private val presetChannels = listOf(
+        StreamChannel("test1", "Mux 测试流", "https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8", "", "测试", "Multi", "1080p", "", "Mozilla/5.0"),
+        StreamChannel("test2", "Apple 测试流", "https://devstreaming-cdn.apple.com/videos/streaming/examples/img_bipbop_adv_example_ts/master.m3u8", "", "测试", "Apple", "720p", "", "Mozilla/5.0"),
+        StreamChannel("test3", "Akamai 直播", "https://moctobpltc-i.akamaihd.net/hls/live/571329/eight/playlist.m3u8", "", "测试", "Akamai", "720p", "", "Mozilla/5.0"),
+        StreamChannel("test4", " Tears of Steel", "https://demo-unified-streaming.appspot.com/video/tears-of-steel/tears-of-steel.ism/.m3u8", "", "测试", "Unified", "1080p", "", "Mozilla/5.0"),
+        StreamChannel("cctv5", "CCTV-5 体育频道", "https://moctobpltc-i.akamaihd.net/hls/live/571329/eight/playlist.m3u8", "", "中国", "体育", "720p", "", "Mozilla/5.0"),
+        StreamChannel("espn", "ESPN 体育", "https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8", "", "美国", "体育", "1080p", "", "Mozilla/5.0"),
     )
 
     fun quickChannels(): List<StreamChannel> {
@@ -86,10 +88,10 @@ object StreamRepository {
         return if (cached.isNullOrEmpty()) presetChannels else presetChannels + cached
     }
 
-    suspend fun loadAllAsync(): List<StreamChannel> {
+    suspend fun loadAllAsync(forceRefresh: Boolean = false): List<StreamChannel> {
         val now = System.currentTimeMillis()
         val cached = cachedChannels
-        if (!cached.isNullOrEmpty() && now - lastFetchMs < CACHE_TTL_MS) {
+        if (!forceRefresh && !cached.isNullOrEmpty() && now - lastFetchMs < CACHE_TTL_MS) {
             return presetChannels + cached
         }
         return try {
@@ -104,24 +106,19 @@ object StreamRepository {
 
     fun fetchAllSportsStreams(): List<StreamChannel> = quickChannels()
 
-    private fun fetchAllInternal(): List<StreamChannel> {
-        val result = ConcurrentHashMap.newKeySet<String>()
-        val channels = java.util.Collections.synchronizedList(mutableListOf<StreamChannel>())
+    private suspend fun fetchAllInternal(): List<StreamChannel> = coroutineScope {
+        val deferred1 = async { runCatching { fetchSportsChannelsInternal() }.getOrNull() }
+        val deferred2 = async { runCatching { fetchFromM3U(IPTV_SPORTS_M3U) }.getOrNull() }
+        val deferred3 = async { runCatching { fetchFromM3U(FREE_TV_M3U) }.getOrNull() }
 
-        val tasks = listOf(
-            { runCatching { fetchSportsChannelsInternal() }.getOrNull() },
-            { runCatching { fetchFromM3U(IPTV_SPORTS_M3U) }.getOrNull() },
-            { runCatching { fetchFromM3U(FREE_TV_M3U) }.getOrNull() },
-        )
-
-        for (task in tasks) {
-            val list = task() ?: continue
-            for (ch in list) {
-                if (result.add(ch.url)) channels.add(ch)
+        val results = listOf(deferred1.await(), deferred2.await(), deferred3.await())
+        val merged = ConcurrentHashMap<String, StreamChannel>()
+        results.forEach { list ->
+            list?.forEach { ch ->
+                if (!merged.containsKey(ch.url)) merged[ch.url] = ch
             }
         }
-
-        return channels.toList()
+        merged.values.toList()
     }
 
     fun fetchSportsChannels(): List<StreamChannel> = fetchSportsChannelsInternal()
@@ -186,6 +183,8 @@ object StreamRepository {
         var currentLogo = ""
         var currentGroup = ""
         var currentQuality = ""
+        var currentReferrer = ""
+        var currentUA = UA
 
         for (line in lines) {
             val trimmed = line.trim()
@@ -198,6 +197,10 @@ object StreamRepository {
                 currentGroup = groupMatch?.groupValues?.getOrNull(1) ?: ""
                 val qualityMatch = Regex("tvg-quality=\"([^\"]+)\"").find(trimmed)
                 currentQuality = qualityMatch?.groupValues?.getOrNull(1) ?: ""
+                val referrerMatch = Regex("http-referrer=\"([^\"]+)\"").find(trimmed)
+                currentReferrer = referrerMatch?.groupValues?.getOrNull(1) ?: ""
+                val uaMatch = Regex("http-user-agent=\"([^\"]+)\"").find(trimmed)
+                if (uaMatch != null) currentUA = uaMatch.groupValues[1]
             } else if (trimmed.isNotEmpty() && !trimmed.startsWith("#")) {
                 if (currentName.isNotEmpty()) {
                     channels.add(StreamChannel(
@@ -208,13 +211,15 @@ object StreamRepository {
                         country = "",
                         category = currentGroup,
                         quality = currentQuality,
-                        referrer = "",
-                        userAgent = UA,
+                        referrer = currentReferrer,
+                        userAgent = currentUA,
                     ))
                 }
                 currentName = ""
                 currentLogo = ""
                 currentGroup = ""
+                currentReferrer = ""
+                currentUA = UA
             }
         }
         return channels
@@ -260,11 +265,10 @@ object StreamRepository {
     private fun fetchText(url: String): String {
         val conn = (URL(url).openConnection() as HttpURLConnection).apply {
             requestMethod = "GET"
-            connectTimeout = 6000
-            readTimeout = 8000
+            connectTimeout = 10000
+            readTimeout = 15000
             setRequestProperty("User-Agent", UA)
             setRequestProperty("Accept", "*/*")
-            setRequestProperty("Connection", "close")
         }
         try {
             return conn.inputStream.bufferedReader().use { it.readText() }

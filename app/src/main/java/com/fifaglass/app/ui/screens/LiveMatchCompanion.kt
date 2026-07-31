@@ -80,6 +80,7 @@ import com.fifaglass.app.ui.GlassCard
 import com.fifaglass.app.ui.GlassColors
 import com.fifaglass.app.ui.glass
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.withContext
 import java.time.Instant
 import java.time.temporal.ChronoUnit
@@ -94,45 +95,69 @@ fun LiveMatchCompanion(
 ) {
     val context = LocalContext.current
     var detail by remember { mutableStateOf<MatchDetail?>(null) }
+    var loadError by remember { mutableStateOf<String?>(null) }
+    var liveMatch by remember { mutableStateOf(m) }
     var livePrediction by remember { mutableStateOf<com.fifaglass.app.rating.Prediction?>(null) }
     var refreshTick by remember { mutableIntStateOf(0) }
+    var retryTick by remember { mutableIntStateOf(0) }
     var matchMinute by remember { mutableIntStateOf(0) }
     var bookmarks = remember { mutableStateListOf<BookmarkedMoment>() }
     var reactions = remember { mutableStateListOf<MatchReaction>() }
     var showGoalAnim by remember { mutableStateOf<GoalAnimData?>(null) }
 
+    LaunchedEffect(m.id, retryTick) {
+        while (isActive) {
+            try {
+                detail = withContext(Dispatchers.IO) { FifaApi.fetchMatchDetail(m) }
+                loadError = null
+            } catch (e: Exception) {
+                loadError = e.message ?: "详情加载失败"
+            }
+            kotlinx.coroutines.delay(15_000L)
+        }
+    }
+
     LaunchedEffect(m.id) {
-        try {
-            detail = withContext(Dispatchers.IO) { FifaApi.fetchMatchDetail(m) }
-        } catch (_: Exception) {}
+        while (isActive) {
+            try {
+                val live = withContext(Dispatchers.IO) {
+                    FifaApi.fetchLiveMatches(1) + FifaApi.fetchLiveMatches(2)
+                }
+                val updated = live.find { it.id == m.id }
+                if (updated != null) liveMatch = updated
+            } catch (_: Exception) {}
+            kotlinx.coroutines.delay(15_000L)
+        }
     }
 
     LaunchedEffect(m.id, refreshTick) {
-        if (m.isLive && m.homeScore != null && m.awayScore != null) {
-            val home = rankings?.firstOrNull { it.code == m.homeCode }
-            val away = rankings?.firstOrNull { it.code == m.awayCode }
+        val homeScore = liveMatch.homeScore
+        val awayScore = liveMatch.awayScore
+        if (liveMatch.isLive && homeScore != null && awayScore != null) {
+            val home = rankings?.firstOrNull { it.code == liveMatch.homeCode }
+            val away = rankings?.firstOrNull { it.code == liveMatch.awayCode }
             if (home != null && away != null) {
-                val min = m.matchTime.filter { it.isDigit() || it == '+' }
+                val min = liveMatch.matchTime.filter { it.isDigit() || it == '+' }
                     .split('+').filter { it.isNotEmpty() }
                     .sumOf { it.toIntOrNull() ?: 0 }
                 matchMinute = min
                 livePrediction = withContext(Dispatchers.IO) {
-                    PredictionEngine.predictLive(home, away, m.homeScore, m.awayScore, min)
+                    PredictionEngine.predictLive(home, away, homeScore, awayScore, min)
                 }
             }
         }
     }
 
-    LaunchedEffect(m.id, m.isLive) {
-        if (!m.isLive) return@LaunchedEffect
+    LaunchedEffect(m.id, liveMatch.isLive) {
+        if (!liveMatch.isLive) return@LaunchedEffect
         while (true) {
-            kotlinx.coroutines.delay(30_000)
+            kotlinx.coroutines.delay(15_000)
             refreshTick++
         }
     }
 
-    val homeTeam = rankings?.firstOrNull { it.code == m.homeCode }
-    val awayTeam = rankings?.firstOrNull { it.code == m.awayCode }
+    val homeTeam = rankings?.firstOrNull { it.code == liveMatch.homeCode }
+    val awayTeam = rankings?.firstOrNull { it.code == liveMatch.awayCode }
     val homePts = homeTeam?.points ?: 0.0
     val awayPts = awayTeam?.points ?: 0.0
 
@@ -143,56 +168,76 @@ fun LiveMatchCompanion(
         item {
             Spacer(Modifier.height(8.dp))
             Text("看球伴侣", color = GlassColors.textPrimary, fontSize = 28.sp, fontWeight = FontWeight.Bold)
-            Text("${m.homeName} vs ${m.awayName} · ${m.competition}", color = GlassColors.textSecondary, fontSize = 13.sp)
+            Text("${liveMatch.homeName} vs ${liveMatch.awayName} · ${liveMatch.competition}", color = GlassColors.textSecondary, fontSize = 13.sp)
             Spacer(Modifier.height(8.dp))
         }
 
+        item {
+            val err = loadError
+            if (err != null && detail == null) {
+                GlassCard(Modifier.fillMaxWidth()) {
+                    Text("数据加载失败", color = GlassColors.accentGold, fontWeight = FontWeight.Bold)
+                    Spacer(Modifier.height(4.dp))
+                    Text(err, color = GlassColors.textSecondary, fontSize = 12.sp)
+                    Spacer(Modifier.height(8.dp))
+                    Box(
+                        Modifier.clip(RoundedCornerShape(10.dp))
+                            .background(GlassColors.accentMint.copy(alpha = 0.2f))
+                            .clickable { retryTick++ }
+                            .padding(horizontal = 14.dp, vertical = 8.dp)
+                    ) {
+                        Text("重试", color = GlassColors.accentMint, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+        }
+
         // 1. 动量计 + 2. 进攻方向指示器
-        item { MomentumCard(m, matchMinute, homePts, awayPts) }
+        item { MomentumCard(liveMatch, matchMinute, homePts, awayPts) }
 
         // 3. 胜率走势图 + 4. 实时预测
         val lp = livePrediction
         item {
             if (lp != null) {
-                WinProbabilityCard(lp, m)
+                WinProbabilityCard(lp, liveMatch)
             }
         }
 
         // 5. 控球率饼图 + 6. 射门热图
-        item { StatsPieCard(m, detail) }
+        item { StatsPieCard(liveMatch, detail) }
 
         // 7. 危险指数 + 8. 比赛节奏
-        item { DangerPaceCard(m, matchMinute) }
+        item { DangerPaceCard(liveMatch, matchMinute) }
 
         // 9. 阵型可视化
         item { FormationCard(detail) }
 
         // 10. 实时事件流（文字直播）
-        item { CommentaryFeedCard(detail, m) }
+        item { CommentaryFeedCard(detail, liveMatch) }
 
         // 11. 换人追踪 + 12. 红黄牌追踪 + 13. 角球 + 14. 任意球 + 15. 越位
-        item { MatchStatsTrackerCard(detail, m) }
+        item { MatchStatsTrackerCard(detail, liveMatch) }
 
         // 16. VAR 追踪
         item { VarTrackerCard(detail) }
 
         // 17. 伤停补时预测
-        item { StoppageTimeCard(m, matchMinute, detail) }
+        item { StoppageTimeCard(liveMatch, matchMinute, detail) }
 
         // 18. 压力指数
-        item { PressureIndexCard(m, matchMinute, homePts, awayPts) }
+        item { PressureIndexCard(liveMatch, matchMinute, homePts, awayPts) }
 
         // 19. 关键时刻书签
         item {
-            BookmarkCard(m, matchMinute, bookmarks)
+            BookmarkCard(liveMatch, matchMinute, bookmarks)
         }
 
         // 20. 快速反应表情
-        item { ReactionCard(m, reactions) }
+        item { ReactionCard(liveMatch, reactions) }
 
         // 21. 进球庆祝动画
         item {
-            GoalCelebrationCard(m) { data ->
+            GoalCelebrationCard(liveMatch) { data ->
                 showGoalAnim = data
                 vibrate(context)
                 beep()
@@ -201,7 +246,7 @@ fun LiveMatchCompanion(
 
         // 工具箱入口
         item {
-            MatchToolsEntry(m, onOpenStream)
+            MatchToolsEntry(liveMatch, onOpenStream)
             Spacer(Modifier.height(100.dp))
         }
     }

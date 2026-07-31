@@ -18,16 +18,27 @@ object FifaApi {
     private const val UA =
         "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36"
 
+    private val detailCache = mutableMapOf<String, Pair<Long, MatchDetail>>()
+    private val DETAIL_CACHE_TTL = 10_000L
+
     private fun get(url: String): String {
         val conn = (URL(url).openConnection() as HttpURLConnection).apply {
             requestMethod = "GET"
-            connectTimeout = 20000
-            readTimeout = 20000
+            connectTimeout = 8000
+            readTimeout = 12000
             setRequestProperty("User-Agent", UA)
             setRequestProperty("Accept", "application/json")
+            setRequestProperty("Referer", "https://www.fifa.com/")
+            setRequestProperty("Origin", "https://www.fifa.com")
         }
         try {
-            return conn.inputStream.bufferedReader().use { it.readText() }
+            val code = conn.responseCode
+            val stream = if (code in 200..299) conn.inputStream else conn.errorStream
+            val body = stream?.bufferedReader()?.use { it.readText() } ?: ""
+            if (code !in 200..299) {
+                throw RuntimeException("HTTP $code: ${body.take(200)}")
+            }
+            return body
         } finally {
             conn.disconnect()
         }
@@ -49,7 +60,7 @@ object FifaApi {
     /** gender: 1=男足 2=女足，返回按名次升序 */
     fun fetchRankings(gender: Int): List<Team> {
         val root = JSONObject(get("https://api.fifa.com/api/v3/rankings?locale=en&gender=$gender"))
-        val arr = root.getJSONArray("Results")
+        val arr = root.optJSONArray("Results") ?: return emptyList()
         val out = ArrayList<Team>(arr.length())
         for (i in 0 until arr.length()) {
             val o = arr.getJSONObject(i)
@@ -195,6 +206,11 @@ object FifaApi {
 
     /** 单场完整详情：事件时间轴 + 阵容 + 技术信息 */
     fun fetchMatchDetail(m: MatchInfo): MatchDetail {
+        val cacheKey = m.id
+        val cached = detailCache[cacheKey]
+        if (cached != null && System.currentTimeMillis() - cached.first < DETAIL_CACHE_TTL) {
+            return cached.second
+        }
         require(m.compId.isNotEmpty() && m.seasonId.isNotEmpty() && m.stageId.isNotEmpty()) {
             "该场比赛没有详情数据"
         }
@@ -322,7 +338,7 @@ object FifaApi {
             if (hp >= 0) possession = hp.toInt()
         }
 
-        return MatchDetail(
+        val result = MatchDetail(
             events = events.sortedBy { it.sortKey },
             homePlayers = homePlayers,
             awayPlayers = awayPlayers,
@@ -333,5 +349,7 @@ object FifaApi {
             attendance = root.optInt("Attendance", 0),
             homePossession = possession,
         )
+        detailCache[cacheKey] = System.currentTimeMillis() to result
+        return result
     }
 }

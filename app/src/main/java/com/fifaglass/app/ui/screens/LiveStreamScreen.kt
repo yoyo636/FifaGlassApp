@@ -38,6 +38,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -53,10 +54,17 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.media3.common.AudioAttributes
+import androidx.media3.common.C
 import androidx.media3.common.MediaItem
+import androidx.media3.common.MimeTypes
+import androidx.media3.common.PlaybackException
+import androidx.media3.common.Player
+import androidx.media3.datasource.DefaultDataSource
+import androidx.media3.datasource.DefaultHttpDataSource
+import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.hls.HlsMediaSource
-import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.ui.PlayerView
 import coil.compose.AsyncImage
 import com.fifaglass.app.data.MatchInfo
@@ -67,11 +75,18 @@ import com.fifaglass.app.ui.GlassCard
 import com.fifaglass.app.ui.GlassColors
 import com.fifaglass.app.ui.glass
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+
+private fun isHlsUrl(url: String): Boolean {
+    val lower = url.lowercase()
+    return lower.contains(".m3u8") || lower.contains(".m3u?") || lower.contains(".m3u8?")
+}
 
 @Composable
 fun LiveStreamScreen(match: MatchInfo?) {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     var allChannels by remember { mutableStateOf<List<StreamChannel>>(StreamRepository.quickChannels()) }
     var filteredChannels by remember { mutableStateOf<List<StreamChannel>>(allChannels) }
     var selectedChannel by remember { mutableStateOf<StreamChannel?>(null) }
@@ -126,15 +141,32 @@ fun LiveStreamScreen(match: MatchInfo?) {
             if (refreshing) {
                 CircularProgressIndicator(color = GlassColors.accentMint, modifier = Modifier.size(14.dp), strokeWidth = 2.dp)
             } else {
-                AuroraRefreshButton { refreshing = true }
+                AuroraRefreshButton {
+                    refreshing = true
+                    scope.launch {
+                        try {
+                            val list = withContext(Dispatchers.IO) {
+                                StreamRepository.loadAllAsync()
+                            }
+                            allChannels = list
+                            filteredChannels = if (match != null) {
+                                StreamRepository.matchChannelsForMatch(list, match)
+                            } else list
+                            applyFilter(query)
+                        } catch (_: Exception) {
+                        } finally {
+                            refreshing = false
+                        }
+                    }
+                }
             }
         }
         Spacer(Modifier.height(12.dp))
 
-        if (current != null && current.url.endsWith(".m3u8")) {
+        if (current != null && isHlsUrl(current.url)) {
             VideoPlayerCard(current)
             Spacer(Modifier.height(12.dp))
-        } else if (current != null && !current.url.endsWith(".m3u8")) {
+        } else if (current != null && !isHlsUrl(current.url)) {
             LaunchedEffect(current.url) {
                 runCatching {
                     val intent = Intent(Intent.ACTION_VIEW, Uri.parse(current.url))
@@ -271,17 +303,65 @@ private fun AuroraFavCard(channels: List<StreamChannel>, selectedUrl: String?, o
 private fun VideoPlayerCard(channel: StreamChannel) {
     val context = LocalContext.current
 
+    var playbackError by remember { mutableStateOf<String?>(null) }
+    var retryCount by remember { mutableIntStateOf(0) }
+
     val exoPlayer = remember(channel.url) {
         runCatching {
-            ExoPlayer.Builder(context).build().apply {
-                val mediaItem = MediaItem.fromUri(channel.url)
-                val mediaSource = HlsMediaSource.Factory(DefaultDataSource.Factory(context))
-                    .createMediaSource(mediaItem)
-                setMediaSource(mediaSource)
-                prepare()
-                playWhenReady = true
-            }
+            val httpFactory = DefaultHttpDataSource.Factory()
+                .setUserAgent(channel.userAgent.ifEmpty { "Mozilla/5.0 (Linux; Android 11) ExoPlayer" })
+                .setDefaultRequestProperties(
+                    buildMap {
+                        if (channel.referrer.isNotEmpty()) put("Referer", channel.referrer)
+                    }
+                )
+                .setConnectTimeoutMs(8000)
+                .setReadTimeoutMs(10000)
+            val dataSourceFactory = DefaultDataSource.Factory(context, httpFactory)
+            ExoPlayer.Builder(context)
+                .setHandleAudioBecomingNoisy(true)
+                .setAudioAttributes(AudioAttributes.DEFAULT, true)
+                .setWakeMode(C.WAKE_MODE_NETWORK)
+                .setLoadControl(
+                    DefaultLoadControl.Builder()
+                        .setBufferDurationsMs(5000, 30000, 1000, 1000)
+                        .setPrioritizeTimeOverSizeThresholds(true)
+                        .build()
+                )
+                .build().apply {
+                    val mediaItem = MediaItem.Builder()
+                        .setUri(channel.url)
+                        .setMimeType(MimeTypes.APPLICATION_M3U8)
+                        .build()
+                    val mediaSource = HlsMediaSource.Factory(dataSourceFactory)
+                        .createMediaSource(mediaItem)
+                    setMediaSource(mediaSource)
+                    prepare()
+                    playWhenReady = true
+                }
         }.getOrNull()
+    }
+
+    LaunchedEffect(channel.url, retryCount) {
+        playbackError = null
+        exoPlayer?.addListener(object : Player.Listener {
+            override fun onPlayerError(error: PlaybackException) {
+                playbackError = when (error.errorCode) {
+                    PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED,
+                    PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS -> "网络连接失败，正在重试…"
+                    PlaybackException.ERROR_CODE_PARSING_MANIFEST_UNSUPPORTED -> "不支持的视频格式"
+                    else -> "播放失败: ${error.errorCodeName}"
+                }
+            }
+        })
+    }
+
+    LaunchedEffect(playbackError) {
+        if (playbackError != null && retryCount < 3) {
+            kotlinx.coroutines.delay(2000L)
+            retryCount++
+            exoPlayer?.prepare()
+        }
     }
 
     DisposableEffect(channel.url) {
@@ -338,13 +418,39 @@ private fun VideoPlayerCard(channel: StreamChannel) {
                     AndroidView(
                         factory = { ctx ->
                             PlayerView(ctx).apply {
-                                player = exoPlayer
                                 useController = true
                                 setShowBuffering(PlayerView.SHOW_BUFFERING_WHEN_PLAYING)
                             }
                         },
+                        update = { view ->
+                            view.player = exoPlayer
+                        },
                         modifier = Modifier.fillMaxSize()
                     )
+                    if (playbackError != null) {
+                        Box(
+                            Modifier
+                                .fillMaxSize()
+                                .background(Color.Black.copy(alpha = 0.6f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text(playbackError ?: "", color = Color.White, fontSize = 13.sp)
+                                Spacer(Modifier.height(8.dp))
+                                Box(
+                                    Modifier.clip(RoundedCornerShape(8.dp))
+                                        .background(GlassColors.accentMint.copy(alpha = 0.25f))
+                                        .clickable {
+                                            retryCount++
+                                            exoPlayer.prepare()
+                                        }
+                                        .padding(horizontal = 12.dp, vertical = 6.dp)
+                                ) {
+                                    Text("重试", color = GlassColors.accentMint, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                }
+                            }
+                        }
+                    }
                 } else {
                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         Text("播放器初始化失败", color = Color.White, fontSize = 13.sp)
