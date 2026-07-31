@@ -79,13 +79,15 @@ object StreamRepository {
         StreamChannel("test2", "Apple 测试流", "https://devstreaming-cdn.apple.com/videos/streaming/examples/img_bipbop_adv_example_ts/master.m3u8", "", "测试", "Apple", "720p", "", "Mozilla/5.0"),
         StreamChannel("test3", "Akamai 直播", "https://moctobpltc-i.akamaihd.net/hls/live/571329/eight/playlist.m3u8", "", "测试", "Akamai", "720p", "", "Mozilla/5.0"),
         StreamChannel("test4", " Tears of Steel", "https://demo-unified-streaming.appspot.com/video/tears-of-steel/tears-of-steel.ism/.m3u8", "", "测试", "Unified", "1080p", "", "Mozilla/5.0"),
-        StreamChannel("cctv5", "CCTV-5 体育频道", "https://moctobpltc-i.akamaihd.net/hls/live/571329/eight/playlist.m3u8", "", "中国", "体育", "720p", "", "Mozilla/5.0"),
-        StreamChannel("espn", "ESPN 体育", "https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8", "", "美国", "体育", "1080p", "", "Mozilla/5.0"),
+        StreamChannel("cctv5", "CCTV-5 体育频道", "https://demo.unified-streaming.com/video/tears-of-steel/tears-of-steel.ism/.m3u8", "", "中国", "体育", "720p", "", "Mozilla/5.0"),
+        StreamChannel("espn", "ESPN 体育", "https://test-streams.mux.dev/test_001/stream.m3u8", "", "美国", "体育", "1080p", "", "Mozilla/5.0"),
     )
 
     fun quickChannels(): List<StreamChannel> {
         val cached = cachedChannels
-        return if (cached.isNullOrEmpty()) presetChannels else presetChannels + cached
+        val combined = if (cached.isNullOrEmpty()) presetChannels else presetChannels + cached
+        val seen = mutableSetOf<String>()
+        return combined.filter { seen.add(it.url) }
     }
 
     suspend fun loadAllAsync(forceRefresh: Boolean = false): List<StreamChannel> {

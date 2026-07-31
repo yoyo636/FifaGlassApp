@@ -232,7 +232,7 @@ fun LiveStreamScreen(match: MatchInfo?) {
                 }
             } else {
                 LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    items(list, key = { it.url }) { ch ->
+                    items(list, key = { it.id + "_" + it.url }) { ch ->
                         AuroraChannelRow(ch, selectedChannel?.url == ch.url) {
                             selectedChannel = ch
                         }
