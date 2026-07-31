@@ -120,13 +120,13 @@ fun AppRoot() {
 
     val context = LocalContext.current
     LaunchedEffect(Unit) {
-        Favorites.init(context)
-        SettingsStore.init(context)
-        SettingsStore.recordOpen()
-        com.fifaglass.app.data.StreamRepository.initFavorites(context)
-        UserRepository.init(context)
-        ForumRepository.init(context)
-        com.fifaglass.app.data.WatchPartyRepository.init(context)
+        runCatching { Favorites.init(context) }
+        runCatching { SettingsStore.init(context) }
+        runCatching { SettingsStore.recordOpen() }
+        runCatching { com.fifaglass.app.data.StreamRepository.initFavorites(context) }
+        runCatching { UserRepository.init(context) }
+        runCatching { ForumRepository.init(context) }
+        runCatching { com.fifaglass.app.data.WatchPartyRepository.init(context) }
     }
 
     var gender by remember { mutableStateOf(1) }
@@ -228,11 +228,15 @@ fun AppRoot() {
                                 onOpenAIAnalyst = {
                                     if (homeTeam != null && awayTeam != null) {
                                         navigate(Screen.AIAnalyst(homeTeam, awayTeam, s.match))
+                                    } else {
+                                        android.widget.Toast.makeText(context, "排名数据加载中，请稍后再试", android.widget.Toast.LENGTH_SHORT).show()
                                     }
                                 },
                                 onOpenFormation = {
                                     if (homeTeam != null && awayTeam != null) {
                                         navigate(Screen.Formation(homeTeam, awayTeam, s.match.homeTactics, s.match.awayTactics))
+                                    } else {
+                                        android.widget.Toast.makeText(context, "排名数据加载中，请稍后再试", android.widget.Toast.LENGTH_SHORT).show()
                                     }
                                 },
                                 onOpenWatchParty = {
@@ -259,7 +263,7 @@ fun AppRoot() {
                             onOpenForum = { navigate(Screen.Forum) },
                             onOpenMyPosts = { navigate(Screen.MyPosts) },
                             onOpenSettings = { navigate(Screen.Settings) },
-                            onLogout = { }
+                            onLogout = { toTab(Screen.Home) }
                         )
                         is Screen.Forum -> ForumScreen(
                             onPostClick = { navigate(Screen.PostDetail(it)) },

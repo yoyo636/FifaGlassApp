@@ -38,13 +38,12 @@ data class MatchInfo(
     val isFinished: Boolean get() = status == 0
     val isScheduled: Boolean
         get() = if (fromLiveEndpoint) {
-            // 实时接口：status 非 0 即视为进行中，不再有"未开始"
-            false
+            homeScore == null && awayScore == null && (matchTime.isEmpty() || matchTime == "0'" || matchTime == "0")
         } else {
-            // 日历接口：status==1 且无比分 = 未开始
             status == 1 && homeScore == null
         }
-    val isLive: Boolean get() = !isFinished && !isScheduled
+    val isLive: Boolean
+        get() = !isFinished && !isScheduled && (homeScore != null || awayScore != null || (matchTime.isNotEmpty() && matchTime != "0'" && matchTime != "0"))
 }
 
 enum class EventType { GOAL, YELLOW, RED, SUB, KICKOFF, HALF_TIME, FULL_TIME, ONGOING }

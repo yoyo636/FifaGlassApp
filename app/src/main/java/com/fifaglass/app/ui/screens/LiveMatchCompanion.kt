@@ -933,14 +933,14 @@ private fun MatchToolsEntry(m: MatchInfo, onOpenStream: () -> Unit = {}) {
         ToolButton("📺 投屏到电视", GlassColors.accentBlue) {
             val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://www.google.com/chromecast"))
             intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK
-            context.startActivity(intent)
+            runCatching { context.startActivity(intent) }
         }
 
         // 23. 转播频道指南
         ToolButton("📡 转播频道", GlassColors.accentMint) {
             val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://www.fifa.com/fifaplus/en/tournaments"))
             intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK
-            context.startActivity(intent)
+            runCatching { context.startActivity(intent) }
         }
 
         // 24. 观赛派对
@@ -950,9 +950,11 @@ private fun MatchToolsEntry(m: MatchInfo, onOpenStream: () -> Unit = {}) {
                 putExtra(Intent.EXTRA_TEXT, "来看球！${m.homeName} vs ${m.awayName}\n${m.competition}\n一起来 FifaGlass 看球！")
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             }
-            context.startActivity(Intent.createChooser(shareIntent, "邀请好友看球").apply {
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            })
+            runCatching {
+                context.startActivity(Intent.createChooser(shareIntent, "邀请好友看球").apply {
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                })
+            }
         }
 
         // 25. 分享比赛
@@ -962,9 +964,11 @@ private fun MatchToolsEntry(m: MatchInfo, onOpenStream: () -> Unit = {}) {
                 putExtra(Intent.EXTRA_TEXT, "${m.homeName} vs ${m.awayName}\n${m.competition}\n${m.date}\nFifaGlass 实时追踪")
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             }
-            context.startActivity(Intent.createChooser(shareIntent, "分享比赛").apply {
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            })
+            runCatching {
+                context.startActivity(Intent.createChooser(shareIntent, "分享比赛").apply {
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                })
+            }
         }
 
         // 26. 比赛日记
@@ -979,28 +983,28 @@ private fun MatchToolsEntry(m: MatchInfo, onOpenStream: () -> Unit = {}) {
         ToolButton("⏰ 设置开赛提醒", GlassColors.up) {
             val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://www.fifa.com/fifaplus/en/tournaments"))
             intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK
-            context.startActivity(intent)
+            runCatching { context.startActivity(intent) }
         }
 
         // 28. 球场导航
         ToolButton("🏟️ 球场信息", GlassColors.accentBlue) {
             val intent = Intent(Intent.ACTION_VIEW, Uri.parse("geo:0,0?q=${m.competition}+stadium"))
             intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK
-            context.startActivity(intent)
+            runCatching { context.startActivity(intent) }
         }
 
         // 29. 天气查询
         ToolButton("🌤️ 比赛日天气", GlassColors.accentMint) {
             val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://weather.com"))
             intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK
-            context.startActivity(intent)
+            runCatching { context.startActivity(intent) }
         }
 
         // 30. 附近酒吧/餐厅
         ToolButton("🍺 找个地方看球", GlassColors.accentGold) {
             val intent = Intent(Intent.ACTION_VIEW, Uri.parse("geo:0,0?q=sports+bar"))
             intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK
-            context.startActivity(intent)
+            runCatching { context.startActivity(intent) }
         }
     }
 }

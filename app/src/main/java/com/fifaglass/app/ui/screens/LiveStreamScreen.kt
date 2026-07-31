@@ -342,9 +342,13 @@ private fun VideoPlayerCard(channel: StreamChannel) {
         }.getOrNull()
     }
 
-    LaunchedEffect(channel.url, retryCount) {
+    LaunchedEffect(channel.url) {
         playbackError = null
-        exoPlayer?.addListener(object : Player.Listener {
+        retryCount = 0
+    }
+
+    DisposableEffect(channel.url, exoPlayer) {
+        val listener = object : Player.Listener {
             override fun onPlayerError(error: PlaybackException) {
                 playbackError = when (error.errorCode) {
                     PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED,
@@ -353,7 +357,11 @@ private fun VideoPlayerCard(channel: StreamChannel) {
                     else -> "播放失败: ${error.errorCodeName}"
                 }
             }
-        })
+        }
+        exoPlayer?.addListener(listener)
+        onDispose {
+            exoPlayer?.removeListener(listener)
+        }
     }
 
     LaunchedEffect(playbackError) {

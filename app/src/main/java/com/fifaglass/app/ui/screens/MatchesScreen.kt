@@ -431,7 +431,7 @@ private fun MatchCard(m: MatchInfo, pointsByCode: Map<String, Double>, onClick: 
                                 fontWeight = FontWeight.Black
                             )
                             Text(
-                                m.matchTime,
+                                if (m.matchTime.isEmpty()) "—" else m.matchTime,
                                 color = GlassColors.down,
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold

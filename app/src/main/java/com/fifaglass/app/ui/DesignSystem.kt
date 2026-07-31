@@ -45,8 +45,8 @@ object Aurora {
     fun card(isDark: Boolean): Brush {
         return Brush.linearGradient(
             colors = listOf(
-                Color.White.copy(alpha = if (isDark) 0.05f else 0.85f),
-                Color.White.copy(alpha = if (isDark) 0.02f else 0.65f),
+                Color.White.copy(alpha = if (isDark) 0.08f else 0.92f),
+                Color.White.copy(alpha = if (isDark) 0.04f else 0.78f),
             )
         )
     }

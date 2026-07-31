@@ -165,53 +165,53 @@ fun AuroraCanvas(isDark: Boolean, modifier: Modifier = Modifier) {
     val a3 = if (isDark) GlassColors.aurora3Dark else GlassColors.aurora3
     val a4 = if (isDark) GlassColors.aurora4Dark else GlassColors.aurora4
     val a5 = if (isDark) GlassColors.aurora5Dark else GlassColors.aurora5
-    val alphaMul = if (isDark) 0.30f else 0.16f
+    val alphaMul = if (isDark) 0.22f else 0.10f
 
     Canvas(modifier = modifier) {
         drawCircle(
             brush = Brush.radialGradient(
                 colors = listOf(a1.copy(alpha = alphaMul * (0.85f + 0.3f * phase1)), Color.Transparent),
-                center = Offset(size.width * (0.15f + 0.10f * phase2), size.height * (0.10f + 0.05f * phase3)),
+                center = Offset(size.width * (0.15f + 0.10f * phase2), size.height * (0.05f + 0.05f * phase3)),
                 radius = size.width * 0.95f,
             ),
             radius = size.width * 0.95f,
-            center = Offset(size.width * (0.15f + 0.10f * phase2), size.height * (0.10f + 0.05f * phase3)),
+            center = Offset(size.width * (0.15f + 0.10f * phase2), size.height * (0.05f + 0.05f * phase3)),
         )
         drawCircle(
             brush = Brush.radialGradient(
                 colors = listOf(a2.copy(alpha = alphaMul * (0.9f + 0.2f * phase2)), Color.Transparent),
-                center = Offset(size.width * (0.85f - 0.08f * phase1), size.height * (0.28f + 0.06f * phase3)),
+                center = Offset(size.width * (0.85f - 0.08f * phase1), size.height * (0.15f + 0.06f * phase3)),
                 radius = size.width * 0.85f,
             ),
             radius = size.width * 0.85f,
-            center = Offset(size.width * (0.85f - 0.08f * phase1), size.height * (0.28f + 0.06f * phase3)),
+            center = Offset(size.width * (0.85f - 0.08f * phase1), size.height * (0.15f + 0.06f * phase3)),
         )
         drawCircle(
             brush = Brush.radialGradient(
                 colors = listOf(a3.copy(alpha = alphaMul * (0.8f + 0.3f * phase3)), Color.Transparent),
-                center = Offset(size.width * (0.50f + 0.15f * phase1), size.height * (0.55f + 0.05f * phase2)),
-                radius = size.width * 0.95f,
+                center = Offset(size.width * (0.50f + 0.15f * phase1), size.height * (0.92f + 0.03f * phase2)),
+                radius = size.width * 0.5f,
             ),
-            radius = size.width * 0.95f,
-            center = Offset(size.width * (0.50f + 0.15f * phase1), size.height * (0.55f + 0.05f * phase2)),
+            radius = size.width * 0.5f,
+            center = Offset(size.width * (0.50f + 0.15f * phase1), size.height * (0.92f + 0.03f * phase2)),
         )
         drawCircle(
             brush = Brush.radialGradient(
                 colors = listOf(a4.copy(alpha = alphaMul * 0.6f * (0.7f + 0.3f * phase2)), Color.Transparent),
-                center = Offset(size.width * (0.20f - 0.05f * phase3), size.height * (0.78f + 0.04f * phase1)),
-                radius = size.width * 0.7f,
+                center = Offset(size.width * (0.20f - 0.05f * phase3), size.height * (0.85f + 0.03f * phase1)),
+                radius = size.width * 0.4f,
             ),
-            radius = size.width * 0.7f,
-            center = Offset(size.width * (0.20f - 0.05f * phase3), size.height * (0.78f + 0.04f * phase1)),
+            radius = size.width * 0.4f,
+            center = Offset(size.width * (0.20f - 0.05f * phase3), size.height * (0.85f + 0.03f * phase1)),
         )
         drawCircle(
             brush = Brush.radialGradient(
                 colors = listOf(a5.copy(alpha = alphaMul * 0.7f * (0.85f + 0.2f * phase3)), Color.Transparent),
-                center = Offset(size.width * (0.92f - 0.05f * phase1), size.height * (0.88f - 0.04f * phase2)),
-                radius = size.width * 0.7f,
+                center = Offset(size.width * (0.92f - 0.05f * phase1), size.height * (0.95f + 0.02f * phase3)),
+                radius = size.width * 0.35f,
             ),
-            radius = size.width * 0.7f,
-            center = Offset(size.width * (0.92f - 0.05f * phase1), size.height * (0.88f - 0.04f * phase2)),
+            radius = size.width * 0.35f,
+            center = Offset(size.width * (0.92f - 0.05f * phase1), size.height * (0.95f + 0.02f * phase3)),
         )
     }
 }
