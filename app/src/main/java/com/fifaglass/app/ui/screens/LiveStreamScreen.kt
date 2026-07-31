@@ -2,6 +2,9 @@ package com.fifaglass.app.ui.screens
 
 import android.content.Intent
 import android.net.Uri
+import android.webkit.WebChromeClient
+import android.webkit.WebView
+import android.webkit.WebViewClient
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -54,18 +57,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
-import androidx.media3.common.AudioAttributes
-import androidx.media3.common.C
-import androidx.media3.common.MediaItem
-import androidx.media3.common.MimeTypes
-import androidx.media3.common.PlaybackException
-import androidx.media3.common.Player
-import androidx.media3.datasource.DefaultDataSource
-import androidx.media3.datasource.DefaultHttpDataSource
-import androidx.media3.exoplayer.DefaultLoadControl
-import androidx.media3.exoplayer.ExoPlayer
-import androidx.media3.exoplayer.hls.HlsMediaSource
-import androidx.media3.ui.PlayerView
 import coil.compose.AsyncImage
 import com.fifaglass.app.data.MatchInfo
 import com.fifaglass.app.data.StreamChannel
@@ -164,7 +155,7 @@ fun LiveStreamScreen(match: MatchInfo?) {
         Spacer(Modifier.height(12.dp))
 
         if (current != null && isHlsUrl(current.url)) {
-            VideoPlayerCard(current)
+            WebViewPlayerCard(current)
             Spacer(Modifier.height(12.dp))
         } else if (current != null && !isHlsUrl(current.url)) {
             LaunchedEffect(current.url) {
@@ -300,81 +291,38 @@ private fun AuroraFavCard(channels: List<StreamChannel>, selectedUrl: String?, o
 }
 
 @Composable
-private fun VideoPlayerCard(channel: StreamChannel) {
+private fun WebViewPlayerCard(channel: StreamChannel) {
     val context = LocalContext.current
 
-    var playbackError by remember { mutableStateOf<String?>(null) }
-    var retryCount by remember { mutableIntStateOf(0) }
-
-    val exoPlayer = remember(channel.url) {
-        runCatching {
-            val httpFactory = DefaultHttpDataSource.Factory()
-                .setUserAgent(channel.userAgent.ifEmpty { "Mozilla/5.0 (Linux; Android 11) ExoPlayer" })
-                .setDefaultRequestProperties(
-                    buildMap {
-                        if (channel.referrer.isNotEmpty()) put("Referer", channel.referrer)
-                    }
-                )
-                .setConnectTimeoutMs(8000)
-                .setReadTimeoutMs(10000)
-            val dataSourceFactory = DefaultDataSource.Factory(context, httpFactory)
-            ExoPlayer.Builder(context)
-                .setHandleAudioBecomingNoisy(true)
-                .setAudioAttributes(AudioAttributes.DEFAULT, true)
-                .setWakeMode(C.WAKE_MODE_NETWORK)
-                .setLoadControl(
-                    DefaultLoadControl.Builder()
-                        .setBufferDurationsMs(5000, 30000, 1000, 1000)
-                        .setPrioritizeTimeOverSizeThresholds(true)
-                        .build()
-                )
-                .build().apply {
-                    val mediaItem = MediaItem.Builder()
-                        .setUri(channel.url)
-                        .setMimeType(MimeTypes.APPLICATION_M3U8)
-                        .build()
-                    val mediaSource = HlsMediaSource.Factory(dataSourceFactory)
-                        .createMediaSource(mediaItem)
-                    setMediaSource(mediaSource)
-                    prepare()
-                    playWhenReady = true
-                }
-        }.getOrNull()
+    val html = remember(channel.url) {
+        """
+        <html>
+        <head>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+        <style>
+            body { margin:0; padding:0; background:#000; overflow:hidden; }
+            video { width:100%; height:100%; object-fit:contain; background:#000; }
+        </style>
+        </head>
+        <body>
+        <video autoplay controls playsinline webkit-playsinline>
+        <source src="${channel.url}" type="application/x-mpegURL">
+        Your browser does not support the video tag.
+        </video>
+        <script>
+        var v = document.querySelector('video');
+        v.addEventListener('error', function() {
+            document.body.innerHTML = '<div style="color:#fff;text-align:center;padding:20px;font-family:sans-serif;">播放失败，请尝试外部播放器</div>';
+        }, true);
+        v.play().catch(function(){});
+        </script>
+        </body>
+        </html>
+        """.trimIndent()
     }
 
-    LaunchedEffect(channel.url) {
-        playbackError = null
-        retryCount = 0
-    }
-
-    DisposableEffect(channel.url, exoPlayer) {
-        val listener = object : Player.Listener {
-            override fun onPlayerError(error: PlaybackException) {
-                playbackError = when (error.errorCode) {
-                    PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED,
-                    PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS -> "网络连接失败，正在重试…"
-                    PlaybackException.ERROR_CODE_PARSING_MANIFEST_UNSUPPORTED -> "不支持的视频格式"
-                    else -> "播放失败: ${error.errorCodeName}"
-                }
-            }
-        }
-        exoPlayer?.addListener(listener)
+    DisposableEffect(Unit) {
         onDispose {
-            exoPlayer?.removeListener(listener)
-        }
-    }
-
-    LaunchedEffect(playbackError) {
-        if (playbackError != null && retryCount < 3) {
-            kotlinx.coroutines.delay(2000L)
-            retryCount++
-            exoPlayer?.prepare()
-        }
-    }
-
-    DisposableEffect(channel.url) {
-        onDispose {
-            exoPlayer?.release()
         }
     }
 
@@ -422,48 +370,23 @@ private fun VideoPlayerCard(channel: StreamChannel) {
                     .aspectRatio(16f / 9f)
                     .background(Color.Black)
             ) {
-                if (exoPlayer != null) {
-                    AndroidView(
-                        factory = { ctx ->
-                            PlayerView(ctx).apply {
-                                useController = true
-                                setShowBuffering(PlayerView.SHOW_BUFFERING_WHEN_PLAYING)
-                            }
-                        },
-                        update = { view ->
-                            view.player = exoPlayer
-                        },
-                        modifier = Modifier.fillMaxSize()
-                    )
-                    if (playbackError != null) {
-                        Box(
-                            Modifier
-                                .fillMaxSize()
-                                .background(Color.Black.copy(alpha = 0.6f)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                Text(playbackError ?: "", color = Color.White, fontSize = 13.sp)
-                                Spacer(Modifier.height(8.dp))
-                                Box(
-                                    Modifier.clip(RoundedCornerShape(8.dp))
-                                        .background(GlassColors.accentMint.copy(alpha = 0.25f))
-                                        .clickable {
-                                            retryCount++
-                                            exoPlayer.prepare()
-                                        }
-                                        .padding(horizontal = 12.dp, vertical = 6.dp)
-                                ) {
-                                    Text("重试", color = GlassColors.accentMint, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                                }
-                            }
+                AndroidView(
+                    factory = { ctx ->
+                        WebView(ctx).apply {
+                            settings.javaScriptEnabled = true
+                            settings.mediaPlaybackRequiresUserGesture = false
+                            settings.allowFileAccess = false
+                            settings.loadWithOverviewMode = true
+                            settings.useWideViewPort = true
+                            webChromeClient = WebChromeClient()
+                            webViewClient = WebViewClient()
+                            loadDataWithBaseURL(null, html, "text/html", "UTF-8", null)
                         }
-                    }
-                } else {
-                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Text("播放器初始化失败", color = Color.White, fontSize = 13.sp)
-                    }
-                }
+                    },
+                    update = { view ->
+                    },
+                    modifier = Modifier.fillMaxSize()
+                )
             }
             Column(Modifier.padding(14.dp)) {
                 Text(channel.name, color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Bold)
@@ -472,12 +395,9 @@ private fun VideoPlayerCard(channel: StreamChannel) {
                 }
                 Spacer(Modifier.height(8.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    if (channel.referrer.isNotEmpty()) {
-                        Text("需 Referer", color = GlassColors.accentGold, fontSize = 10.sp)
-                    }
                     Box(
                         Modifier.clip(RoundedCornerShape(8.dp))
-                            .background(Color.White.copy(alpha = 0.15f))
+                            .background(GlassColors.accentMint.copy(alpha = 0.25f))
                             .clickable {
                                 runCatching {
                                     val intent = Intent(Intent.ACTION_VIEW, Uri.parse(channel.url))
@@ -485,9 +405,12 @@ private fun VideoPlayerCard(channel: StreamChannel) {
                                     context.startActivity(intent)
                                 }
                             }
-                            .padding(horizontal = 10.dp, vertical = 4.dp)
+                            .padding(horizontal = 12.dp, vertical = 6.dp)
                     ) {
-                        Text("外部播放器", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        Text("外部播放器", color = GlassColors.accentMint, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    }
+                    if (channel.referrer.isNotEmpty()) {
+                        Text("需 Referer", color = GlassColors.accentGold, fontSize = 10.sp)
                     }
                 }
             }

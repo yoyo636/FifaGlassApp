@@ -53,6 +53,12 @@ class MainActivity : ComponentActivity() {
             request
         )
 
+        val previousHandler = Thread.getDefaultUncaughtExceptionHandler()
+        Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
+            android.util.Log.e("FifaGlassCrash", "Uncaught exception on ${thread.name}", throwable)
+            previousHandler?.uncaughtException(thread, throwable)
+        }
+
         setContent {
             AppRoot()
         }
